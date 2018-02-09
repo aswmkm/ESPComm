@@ -9,14 +9,10 @@ ESP8266 Arduino code example
 #include <vector>
 #include "ESPComm.h"
 
-
-//ESP8266WebServer server(80);
 WiFiClient client;
 MySQL_Connection SQL_Connection((Client *)&client);
 
-
-//const char password[] = "tightwad22.", ssid[] = "Intellivision";
-ESPComm ESPDevice;
+ESPComm ESPDevice; //Device object init
 
 const char INDEX_HTML[] PROGMEM =
 "<!DOCTYPE HTML>"
@@ -44,11 +40,11 @@ const char INDEX_HTML[] PROGMEM =
 //MAIN Functions
 void setup() 
 {
-	
   Serial.begin(250000); //Set up the serial communication.
   WiFi.mode(WIFI_AP_STA); //Access point and station. 
   //setupAccessPoint();
   ESPDevice.setup();
+  WiFi.persistent(false);
 }
 
 void loop()
@@ -63,8 +59,10 @@ void ESPComm::setup()
 	p_server = new ESP8266WebServer(80); //Open on port 80 (http)
 	//p_Client = new WiFiClient;
 	//p_SQL_Connection = new MySQL_Connection((Client *)&p_Client);
-	//setupServer(); //Set up the web hosting stuff.
-	WiFi.enableAP(false); //Disable AP mode by default.
+	setupServer(); //Set up the web hosting directories.
+	WiFi.softAPdisconnect( false ); //AP mode disabled by default.
+	b_verboseMode = true; //Do this by default for now, will probably have an eeprom setting for this later.
+	i_timeoutLimit = 10; //20 second default, will probably be an eeprom config later
 }
 
 void ESPComm::Process()
@@ -74,82 +72,73 @@ void ESPComm::Process()
 	
 	if ( status == WL_CONNECTED ) //Only o this stuff if we're connected to a network.
 	{
-		if ( b_attemptingConnection )
-		{
-			Serial.println( "Connected with local IP: " + String(WiFi.localIP()) );
-			b_attemptingConnection = false;
-		}
 		p_server->handleClient(); //Process stuff for clients that have connected.
 	}
-		
-	/*else if ( status == WL_CONNECT_FAILED && status != currentStatus )
-	{
-		Serial.println("Failed to connect to network.");
-		currentStatus = status;
-		
-	}
-	else if ( status == WL_CONNECTION_LOST && status != currentStatus );
-	{
-		Serial.println("Network connection lost.");
-		currentStatus = status;
-	}*/
 }
 
 // Handling the / root web page from my server
 void ESPComm::HandleIndex()
 {
 	
-    p_server->send(200, "text/html", INDEX_HTML );
+    p_server->send(200, "text/html", INDEX_HTML ); //Testing
 }
 
 void ESPComm::HandleConfig()
 {
 
-	p_server->send(200, "text/html", " " );
+	p_server->send(200, "text/html", "This is the config page." );
 }
 
 void ESPComm::HandleLogin()
 {
-	p_server->send( 200, "text/html", " ");
+	p_server->send( 200, "text/html", "This is the login page.");
 }
 
+void ESPComm::HandleAdmin()
+{
+	p_server->send( 200, "text/html", "This is the admin page.");
+}
 
 //THis function creates the access point if a network is unavailable for us to connect to. 
 bool ESPComm::setupAccessPoint( String ssid, String password )
 {
 	if ( WiFi.status() == WL_CONNECTED )
 	{
-		Serial.println( "Wifi is already connected, please disconnect before attempting to scan for available networks,");
+		sendMessage( "Wifi is already connected, please disconnect before attempting to scan for available networks.", true );
 		return false;
 	}
+	
 	WiFi.disconnect(); //Just to be sure.
 	WiFi.mode(WIFI_AP_STA);
 	WiFi.enableAP(true);
-	Serial.println("- start ap with SID: "+ String(ssid));
+	sendMessage( "Opening access point with SID: "+ String(ssid) );
 	WiFi.softAP(ssid.c_str(), password.c_str()); //Set up the access point with our password and SSID name.
 	IPAddress myIP = WiFi.softAPIP();
-	Serial.print("- AP IP address is :");
-	Serial.println(myIP);
+	sendMessage("IP address is :" + String(myIP) );
 	setupServer(); //Host our pages
 	return true;
 }
 
-void ESPComm::closeConnection()
+void ESPComm::closeConnection( bool msg )
 {
-	WiFi.enableAP(false);
-	p_server->close();
-	WiFi.disconnect();
+	if ( msg )
+		sendMessage("Disconnecting/Closing Wifi connection.");
+	
+	WiFi.setAutoReconnect( false ); 
+	WiFi.softAPdisconnect( false ); //Close the AP, if open.
+	p_server->close(); //Stop the web server.
+	WiFi.disconnect(); //Disconnect the wifi
 }
 
 void ESPComm::setupServer()
 {
-	Serial.println("Starting server :");
 	//These set up our page triggers, linking them to specific functions.
 	p_server->on("/config", std::bind(&ESPComm::HandleConfig, this) );
 	p_server->on("/", std::bind(&ESPComm::HandleIndex, this) );
 	p_server->on("/login", std::bind(&ESPComm::HandleLogin, this) );
+	p_server->on("/admin", std::bind(&ESPComm::HandleAdmin, this) );
 	//
-	p_server->begin();
+	//p_server->begin();
 };
 
 
@@ -157,38 +146,56 @@ void ESPComm::scanNetworks()
 {
 	if ( WiFi.status() == WL_CONNECTED )
 	{
-		Serial.println( "Wifi is already connected, please disconnect before attempting to scan for available networks,");
+		sendMessage( "Wifi is already connected, please disconnect before attempting to scan for available networks.", true );
 		return;
 	}
 		
 	WiFi.mode(WIFI_STA);
-	WiFi.disconnect(); //Just in case
+	closeConnection( false ); //Just in case
 	delay(100);
 	int n = WiFi.scanNetworks(); //More than 255 networks in an area? Possible I suppose.
 	if (!n)
-		Serial.println("no networks found");
+		sendMessage("No networks found");
 	else
 	{
-		Serial.print(n);
-		Serial.println(" networks found");
+		sendMessage( String(n) + " networks found.");
 		for (int i = 0; i < n; ++i)
 		{
 			// Print SSID and RSSI for each network found
-			Serial.print(i + 1);
-			Serial.print(": ");
-			Serial.print(WiFi.SSID(i));
-			Serial.print(" (");
-			Serial.print(WiFi.RSSI(i));
-			Serial.print(")");
-			Serial.println((WiFi.encryptionType(i) == ENC_TYPE_NONE)?" ":"*");
+			sendMessage( String( i ) + ": " + WiFi.SSID(i) + " (" +  WiFi.RSSI(i) + ")" + ( ( WiFi.encryptionType(i) == ENC_TYPE_NONE )?" ":"*" ), true );
 			delay(10);
 		}
 	}
 }
 
-void ESPComm::beginConnection( const char* ssid, const char* password )
+void ESPComm::beginConnection( String ssid, String password )
 {
-	Serial.println("Attempting connection to: " + String(ssid) );
-	WiFi.setAutoReconnect(true); //Set up to automatically reconnect to network if disconnected.
-	WiFi.begin( ssid, password );
+	uint8_t i_retries = 0;
+	sendMessage("Attempting connection to: " + ssid + " using password " + password );
+	WiFi.mode(WIFI_AP_STA);
+	WiFi.begin( ssid.c_str(), /*password.c_str()*/"testing123" );
+	while ( WiFi.status() != WL_CONNECTED && i_retries < i_timeoutLimit ) //We'll give it 10 seconds to try to connect?
+	{
+		sendMessage(".");
+		delay(1000); 
+		i_retries++;
+	}
+	if ( i_retries < i_timeoutLimit )
+	{
+		sendMessage("Connected to " + ssid + " with local IP: " + WiFi.localIP().toString() );
+		p_server->begin(); //start the server
+	}
+	else 
+	{
+		sendMessage("Connection to " + ssid + " timed out.", true ); 
+		closeConnection( false );
+	}
+}
+
+void ESPComm::sendMessage( String str, bool force )
+{
+	if ( !b_verboseMode && !force ) //verbose mode disabled, and we're not forcing the message to send.
+		return;
+		
+	Serial.println( str );
 }

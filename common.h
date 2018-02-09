@@ -26,7 +26,9 @@ const char CMD_DISCONNECT = 'd',
 		   CMD_NETWORKS = 's', //scan
 		   CMD_CREATEFIELD = 'f', //field <address#>:<type#>
 		   CMD_NETINFO = 'i', //request current network info <if connected>
-		   CMD_AP = 'a'; //"ssid":"password"
+		   CMD_AP = 'a', //"ssid":"password"
+		   CMD_VERBOSE = 'v', //<mode> can be 0 or any non-zero value, as well as 'on' or 'off'
+		   CMD_PROGRAM = 'p'; //stores specified values to eeprom so that they will load automatically in the future
 		   
 
 

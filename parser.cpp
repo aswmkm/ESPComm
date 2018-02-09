@@ -18,7 +18,6 @@ void ESPComm::parseSerialData()
 	if ( Serial.available() ) //Have something in the serial buffer.
 	{
 		Serial.readBytesUntil( END_TRANS, buffer, MAX_BUFFERSIZE - 1 ); //read into the buffer.
-		Serial.println( buffer );
 		
 		for ( int pos = 0; pos < MAX_BUFFERSIZE - 1; pos++ )
 		{
@@ -28,7 +27,6 @@ void ESPComm::parseSerialData()
 			if ( buffer[pos] == CMD_PREFIX ) //Found our command indicator in the buffer
 			{
 				pos++; //increment our pos +1
-				Serial.println("Found a cmd");
 				if ( pos > MAX_BUFFERSIZE - 1 || buffer[pos] == NULL_CHAR )
 					break; //Safety first. End here
 					
@@ -36,16 +34,12 @@ void ESPComm::parseSerialData()
 				{
 					case CMD_CONNECT: //For connecting to a wifi router ** Should be able to connect by SSID index as well. 
 						parseConnect( parseArgs( pos, buffer ) );
-						Serial.println("Called connect command");
 						break;
 					case CMD_LOGIN: //For logging into a SQL server
 						Serial.println("Called login command");
 						break;
 					case CMD_DISCONNECT: //Disconnect from current wifi network
-						Serial.println("Disconnecting/Closing Wifi connection.");
-						WiFi.enableAP(false);
-						p_server->close();
-						WiFi.disconnect();
+						closeConnection();
 						break;
 					case CMD_UPDATE: //For updating any necessary data fields that are displayed in the HTML pages
 						//parseUpdateField( pos, buffer );
@@ -59,9 +53,15 @@ void ESPComm::parseSerialData()
 						scanNetworks();
 						break;
 					case CMD_AP: //Telling the ESP to become an access point "name":"password"
-						Serial.println("Called AP command"); //Debug
 						if( !parseAccessPoint( parseArgs( pos, buffer ) ) )
-							Serial.println("Failed to create access point.");
+							sendMessage("Failed to create access point.", true );
+						break;
+					case CMD_VERBOSE:
+						parseVerbose( parseArgs( pos, buffer ) );
+						break;
+					case CMD_NETINFO: //Status
+						sendMessage(String(WiFi.status()), true );
+						sendMessage( "IP: " + WiFi.localIP().toString() );
 						break;
 				}
 				
@@ -111,18 +111,12 @@ vector<String> ESPComm::parseArgs( int &pos, char buffer[] ) //Here is where we 
 
 bool ESPComm::parseAccessPoint( vector<String> args )
 {
-	for ( uint8_t x = 0; x < args.size(); x++ ) //Cycle through the parsed arguments for this command.
-	{
-		Serial.print(x);
-		Serial.println( ": " + args[x] );//debug stuff
-	}
-
 	//<SSID>:<Password>
 	if ( args.size() >= 2 ) //Make sure they exist, prevent crashing
 		return setupAccessPoint( args[0], args[1] ); //Any other args will be discarded (not used)
 	else 
 	{
-		Serial.println( "Not enough arguments to start AP.");
+		sendMessage( "Not enough arguments to initialize access point.", true );
 		return false;
 	}
 }
@@ -131,29 +125,37 @@ bool ESPComm::parseAccessPoint( vector<String> args )
 void ESPComm::parseConnect( vector<String> args )
 {
 	//<SSID>:<Password>
-
 	if ( args.size() >= 2 )
 	{
-		
 		if ( args[0].c_str()[0] == '#' )//If we're using the number sign for the SSID input, we're indicating
 		{
 			unsigned int ssidIndex = parseInt(args[0]);
 			if ( !ssidIndex || !WiFi.SSID( ssidIndex ).length() )
 			{
-				Serial.println("Invalid index ID - Cannot connect to network.");
+				sendMessage("Invalid SSID index - Cannot connect to network.", true );
 				return;
 			}
-			beginConnection( WiFi.SSID(ssidIndex).c_str(), args[1].c_str() );
+			beginConnection( WiFi.SSID(ssidIndex), args[1] );
 		}
 		else
-		{
-			
-			WiFi.begin(  );
-			beginConnection( args[0].c_str(), args[1].c_str() );
-		}
+			beginConnection( args[0], args[1] );
 	}
 	else
-		Serial.println("Not enough arguments to connect to network.");
+		sendMessage("Not enough arguments to connect to network.", true );
+}
+
+void ESPComm::parseVerbose( vector<String> args )
+{
+	if ( args.size() > 0 ) //Make sure we've got some data.
+	{ 
+		uint8_t value = parseInt( args[0] ); //See if we have a numeric value 
+		args[0].toLowerCase(); //Convert all chars to lower case for comparison purposes.
+		
+		if ( value || args[0] == "on" )//Greater than 0 or specified "on"
+			b_verboseMode = true;
+		else if ( !value || args[0] == "off" )
+			b_verboseMode = false;
+	}
 }
 
 long parseInt( String str )

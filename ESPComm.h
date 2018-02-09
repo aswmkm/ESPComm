@@ -32,28 +32,33 @@ public:
 
 	//Parser stuff
 	void parseSerialData();
-	vector<String> parseArgs( int &pos, char buffer[] );
-	bool parseAccessPoint( vector<String> args );
-	void parseConnect( vector<String> args );
+	vector<String> parseArgs( int &pos, char buffer[] ); //Used as the first interpreter, to divide up all arguments to their respective functions.
+	bool parseAccessPoint( vector<String> args ); //Used to set te device as a wireless access point.
+	void parseConnect( vector<String> args ); //Used to parse values used to connect to existing wireless networks.
+	void parseVerbose( vector<String> args ); //Used to enable/disable verbose mode.
 	//
 	
 	void Process(); //This basically functions as our loop function
 	void setup(); //Setup functions to be called when device inits.
 	void setupServer(); //Links specific web server address to corresponding page generation functions.
-	void beginConnection( const char *, const char *);
-	void closeConnection();
+	void beginConnection( String, String ); //Used to connect to an existing wireless network.
+	void closeConnection( bool = true ); //Used to close all connections to the ESP device.
+	void sendMessage( String, bool = false ); //This prepares 
 	
 	//These functions handle the generation of HTML pages t be transmitted to users
-	void HandleIndex();
-	void HandleConfig();
-	void HandleLogin();
+	void HandleIndex(); //Index that displays the data fields.
+	void HandleConfig(); //Device config (possibly user specific configs loaded from SQL (if available ?) ) 
+	void HandleLogin(); //User (student) login page.
+	void HandleAdmin(); //Administration page (instructor page)
 	//
 
 private:
 	bool b_attemptingConnection;
+	bool b_verboseMode; //Used to determine what messages should be sent over the serial channel
 	vector <DataField *> p_dataFields;
 	wl_status_t currentStatus;
 	ESP8266WebServer *p_server;
+	uint8_t i_timeoutLimit;
 };
 
 
