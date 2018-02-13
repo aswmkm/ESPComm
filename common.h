@@ -15,7 +15,8 @@ using namespace std;
 #define NULL_CHAR '/0'
 #define MAX_BUFFERSIZE 128
 
-const char END_TRANS = 0x4;
+const char CHAR_WILDCARD = 5; //ENQ Ascii char - refer to chart (non-printable char) 
+
 const char CMD_PREFIX = '/', // "\"
 		   DATA_SPLIT = ':'; //Char used to split multiple strings of data in a serial commamnd stream
 

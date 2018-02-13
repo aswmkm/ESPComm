@@ -15,11 +15,11 @@ void ESPComm::parseSerialData()
 {	
 	char buffer[MAX_BUFFERSIZE] = { NULL_CHAR };
 		
-	if ( Serial.available() ) //Have something in the serial buffer.
+	if ( Serial.available() ) //Have something in the serial buffer?
 	{
-		Serial.readBytesUntil( END_TRANS, buffer, MAX_BUFFERSIZE - 1 ); //read into the buffer.
-		
-		for ( int pos = 0; pos < MAX_BUFFERSIZE - 1; pos++ )
+		Serial.readBytesUntil( NULL_CHAR, buffer, MAX_BUFFERSIZE - 1 ); //read into the buffer.
+		uint8_t length = strlen(buffer); 
+		for ( int pos = 0; pos < length ; pos++ )
 		{
 			if ( buffer[pos] == NULL_CHAR )
 				break; //Assume that a null char is the end of the buffer.
@@ -27,42 +27,44 @@ void ESPComm::parseSerialData()
 			if ( buffer[pos] == CMD_PREFIX ) //Found our command indicator in the buffer
 			{
 				pos++; //increment our pos +1
-				if ( pos > MAX_BUFFERSIZE - 1 || buffer[pos] == NULL_CHAR )
+				if ( pos >= length || buffer[pos] == NULL_CHAR )
 					break; //Safety first. End here
 					
 				switch ( buffer[pos] )
 				{
 					case CMD_CONNECT: //For connecting to a wifi router ** Should be able to connect by SSID index as well. 
-						parseConnect( parseArgs( pos, buffer ) );
+						parseConnect( parseArgs( pos, length, buffer ) );
 						break;
 					case CMD_LOGIN: //For logging into a SQL server
-						Serial.println("Called login command");
+						Serial.println("Called login command (NOT IMPLEMENTED)");
+						break;
+					case CMD_PROGRAM:
+						parseEEPROMCfg( parseArgs( pos, length, buffer ) );
 						break;
 					case CMD_DISCONNECT: //Disconnect from current wifi network
 						closeConnection();
 						break;
 					case CMD_UPDATE: //For updating any necessary data fields that are displayed in the HTML pages
-						//parseUpdateField( pos, buffer );
-						Serial.println("Called update command");
+						parseUpdate( parseArgs( pos, length, buffer ) );
 						break;
 					case CMD_CREATEFIELD: //For assigning a new data field, as well as a corresponding address number and type. 
-						//parseCreateField( pos, buffer );
-						Serial.println("Called CreateField command");
+						parseDataFields( parseArgs( pos, length, buffer ) );
 						break;
 					case CMD_NETWORKS: //For listing all available networks
 						scanNetworks();
 						break;
 					case CMD_AP: //Telling the ESP to become an access point "name":"password"
-						if( !parseAccessPoint( parseArgs( pos, buffer ) ) )
+						if( !parseAccessPoint( parseArgs( pos, length, buffer ) ) )
 							sendMessage("Failed to create access point.", true );
 						break;
-					case CMD_VERBOSE:
-						parseVerbose( parseArgs( pos, buffer ) );
+					case CMD_VERBOSE: //Enable/disable verbose mode
+						parseVerbose( parseArgs( pos, length, buffer ) );
 						break;
 					case CMD_NETINFO: //Status
-						sendMessage(String(WiFi.status()), true );
-						sendMessage( "IP: " + WiFi.localIP().toString() );
+						printDiag();
 						break;
+					default:
+						continue; //Nothing here? just skip it.
 				}
 				
 			}
@@ -70,40 +72,43 @@ void ESPComm::parseSerialData()
 	}
 }
 
-vector<String> ESPComm::parseArgs( int &pos, char buffer[] ) //Here is where we split our buffer up into a series of strings, we'll read until the next CMD_PREFIX char.
+vector<String> ESPComm::parseArgs( int &pos, const uint8_t &len, const char buffer[] ) //Here is where we split our buffer up into a series of strings, we'll read until the next CMD_PREFIX char.
 {
 	vector<String> args;
 	bool quoteBegin = false;
 	String tempStr;
 	
-	for ( pos, pos < MAX_BUFFERSIZE - 1; pos++; )
+	for ( pos, pos < len; pos++; )
 	{
-		if ( buffer[pos] == CMD_PREFIX || buffer[pos] == NULL_CHAR ) //Start of a new command or end of the buffer.
+		if ( buffer[pos] == CMD_PREFIX || buffer[pos] == NULL_CHAR || pos >= len ) //Start of a new command or end of the buffer.
 		{
 			if ( buffer[pos] == CMD_PREFIX )
 				pos--; //Jump back a step so that other command can be interpreted in parseSerialData
 				
-			args.push_back( tempStr ); //TODO -- Make sure that the tempstr has some valid data inside, before adding it to the vector.
+			args.push_back( tempStr ); 
 			return args; //Exit the function, and push our arguments.
 		}
 				
 		if ( buffer[pos] == '"' ) //Check for the beginning of quotes to prohibit further filtering.
 		{
 			quoteBegin = !quoteBegin; //Toggle
-			continue; //Skip this char and move on.
+			continue; //Skip this char and move on
 		}
-		if ( buffer[pos] == ' ' && !quoteBegin) //Filter whitespaces if we're not between the quotes
-			continue; //Skip
-						
-		if ( buffer[pos] == DATA_SPLIT ) ///*&& ( ( !quoteBegin && inQuotes ) || !inQuotes ) */)
+		
+		if ( !quoteBegin ) //Assuming we're not in quotes here.
 		{
-			args.push_back( tempStr ); //We've reached the splitter char for multiple data streams. 
-			tempStr = ""; //Clear the string.
-			quoteBegin = false; //Reset just in case
-			continue; //Skip this char
-		}	
-		else 
-			tempStr.concat( buffer[pos] ); //Add the char to our string.
+			if ( ( buffer[pos] <= 32 || buffer[pos] > 126 ) ) //Filter all non-printable ascii chars and whitespace if we're not between the quotes
+				continue; //Skip
+						
+			if ( buffer[pos] == DATA_SPLIT  ) //DATA_SPLIT can be a valid char if in quotes.
+			{
+				args.push_back( tempStr ); //We've reached the splitter char for multiple data streams. 
+				tempStr = ""; //Clear the string.
+				continue; //Skip this char
+			}	
+		}
+
+		tempStr.concat( buffer[pos] ); //Add the char to our string if we've come this far.
 	}
 	
 	return args;
@@ -124,21 +129,48 @@ bool ESPComm::parseAccessPoint( vector<String> args )
 //For connecting to a wifi network, must be currently disconnected before connecting to a new network
 void ESPComm::parseConnect( vector<String> args )
 {
-	//<SSID>:<Password>
-	if ( args.size() >= 2 )
+	//<SSID>:<Password>:<special mode>
+	if ( args.size() >= 2 ) //Minimum args.
 	{
-		if ( args[0].c_str()[0] == '#' )//If we're using the number sign for the SSID input, we're indicating
+		if ( args.size() >= 3 ) //More than 2 args?
 		{
-			unsigned int ssidIndex = parseInt(args[0]);
-			if ( !ssidIndex || !WiFi.SSID( ssidIndex ).length() )
+			if ( args[2] == "#" )//Connect by index option. This only works if a scan has already been performed.
 			{
-				sendMessage("Invalid SSID index - Cannot connect to network.", true );
+				unsigned int ssidIndex = parseInt(args[0]);
+				int8_t indexes = WiFi.scanComplete();
+				if ( !ssidIndex || indexes <= 0 || ssidIndex > indexes )
+				{
+					sendMessage("Invalid SSID index: " + String(ssidIndex), true );
+					return;
+				}
+				beginConnection( WiFi.SSID(ssidIndex), args[1] );
 				return;
 			}
-			beginConnection( WiFi.SSID(ssidIndex), args[1] );
+			else if ( args[2] == "*" ) //Wild-card connection option.
+			{
+				WiFi.scanNetworks(); //Build a list of all available networks first.
+				int8_t numResults = WiFi.scanComplete(); //We need to build an index for all available nearby networks first
+				if ( numResults > 0 ) //It's possible to have negative numbers here (error codes)
+				{
+					for ( uint8_t i = 0; i < numResults; i++ )
+					{
+						if ( !strncmp( args[0].c_str(), WiFi.SSID(i).c_str(), args[0].length() ) ) //Returns 0 if strings are equal
+						{
+							beginConnection( WiFi.SSID(i), args[1] );
+							return;
+						}
+					}
+					sendMessage("No valid SSID match found using wild-card.");
+					return;
+				}
+				else
+					sendMessage("Scan returned no available networks, cannot connect via wild-card." );
+				
+				return; //if we've made it this far, we're probably going nowhere. just end.
+			}	
 		}
-		else
-			beginConnection( args[0], args[1] );
+		 
+		beginConnection( args[0], args[1] ); //Normal connection method
 	}
 	else
 		sendMessage("Not enough arguments to connect to network.", true );
@@ -158,6 +190,87 @@ void ESPComm::parseVerbose( vector<String> args )
 	}
 }
 
+void ESPComm::parseDataFields( vector<String> args ) // /f<address><type_num><Label Text*><method name*><default value text*>
+{	
+	if ( args.size() >= 2 )	//Must have at least 2 fields.
+	{
+		int address = parseInt( args[0] );
+		int8_t type = parseInt( args[1] ); //can also be negative*
+		
+		if ( address ) //Address must be a non 0 value.
+		{
+			for ( uint8_t x = 0; x < p_dataFields.size(); x++ )
+			{
+				if ( p_dataFields[x]->GetAddress() == address ) //Address exists?
+				{
+					if ( type == TYPE_REMOVE ) //Looking to remove it?
+					{
+						delete p_dataFields[x];//delete
+						p_dataFields.erase( p_dataFields.begin() + x );
+						sendMessage("Field: " + String(address) + " removed." );
+					}
+					else
+						sendMessage("Address detected in existing data field."); //duplicate address being created
+						
+					return; //Die here.
+				}
+			}
+			
+			if ( type < TYPE_NONE ) //Could be a remove command or something.
+				return;
+			
+			DataField *newField;
+			switch ( args.size() ) //varying number of inputs is possible.
+			{
+				case 2: //Min fields necessary.
+					newField = new DataField( address, type );
+					break;
+				case 3:
+					newField = new DataField( address, type, args[2] );
+					break;
+				case 4:
+					newField = new DataField( address, type, args[2], args[3] );
+					break;
+				case 5://MAX number of fields for now
+					newField = new DataField( address, type, args[2], args[3], args[4] );
+					break;
+			}
+			p_dataFields.push_back( newField ); //Add it to the vector.
+		}
+	}
+	else if ( args.size() && args[0] == "*" && p_dataFields.size() ) //Print some diag info.
+	{
+		String tempStr = "Data Fields at Indexes: ";
+		for ( uint8_t x = 0; x < p_dataFields.size(); x++ )
+			tempStr += String( p_dataFields[x]->GetAddress() ) + ",";
+		sendMessage( tempStr );
+	}
+	else
+		sendMessage("Not enough valid arguments to create new data field.");
+}
+
+void ESPComm::parseUpdate( vector<String> args ) // /u<Index><Data>
+{
+	if ( args.size() >= 2 ) //For now, other args are discarded.
+	{
+		int address = parseInt( args[0] );
+		
+		if ( address ) //Must be a non zero value.
+		{
+			for ( uint8_t x = 0; x < p_dataFields.size(); x++ )
+			{
+				if ( p_dataFields[x]->GetAddress() == address )
+				{
+					p_dataFields[x]->SetFieldValue( args[1] ); //Set the new data
+					return; //End here.
+				}
+			}
+			sendMessage("Failed to make any update to field with index: " + String(address) );
+		}
+	}
+	sendMessage("Not enough valid arguments for update.");
+}
+
 long parseInt( String str )
 {
 	String tempstr;
@@ -165,9 +278,15 @@ long parseInt( String str )
 	{
 		char tempChar = str.charAt(x);
 		
-		if ( tempChar > 47 && tempChar < 58 )//only add number chars to the string
+		if ( tempChar > 47 && tempChar < 58 || tempChar == 45 )//only add number chars to the string, also the negative sign
 			tempstr.concat( tempChar );
 	}
 	
 	return tempstr.toInt(); //Will return 0 if buffer does not contain data. (safe)
+}
+
+
+void ESPComm::parseEEPROMCfg( vector<String> )
+{
+	
 }
