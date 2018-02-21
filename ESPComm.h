@@ -27,32 +27,33 @@ class ESPComm
 {
 public:
 	ESPComm()
-	{
-		b_attemptingConnection = false;		
+	{	
+		i_second = i_minute = i_hour = i_day = i_month = i_year = i_lastNISTupdate = 0; //Init to 0
 	}
 	
 	void scanNetworks(); //Used to output to serial that gives detains on various available networks.
-	bool setupAccessPoint( String ssid, String password ); //This function creates an access point based on inputted data
+	bool setupAccessPoint( const String &, const String & ); //This function creates an access point based on inputted data
 
 	//Parser stuff
 	void parseSerialData();
 	vector<String> parseArgs( int &, const uint8_t &, const char buffer[] ); //Used as the first interpreter, to divide up all arguments to their respective functions.
-	bool parseAccessPoint( vector<String>  ); //Used to set te device as a wireless access point.
-	void parseConnect( vector<String>  ); //Used to parse values used to connect to existing wireless networks.
-	void parseVerbose( vector<String> ); //Used to enable/disable verbose mode.
-	void parseDataFields( vector<String> ); //Used in the creation of data fields to be displayed via HTML (dynamically)
-	void parseUpdate( vector<String>  ); //Used for the updating of data field values.
-	void parseConfig( vector<String> ); //Used to modify local device configurations.
+	bool parseAccessPoint( const vector<String> & ); //Used to set the device as a wireless access point.
+	void parseConnect( const vector<String> & ); //Used to parse values used to connect to existing wireless networks.
+	void parseVerbose( const vector<String> & ); //Used to enable/disable verbose mode.
+	void parseDataFields( const vector<String> & ); //Used in the creation of data fields to be displayed via HTML (dynamically)
+	void parseUpdate( const vector<String> & ); //Used for the updating of data field values.
 	void parseLogin( vector<String> ); //Used to log into (and load) user data stored remotely
+	void parseTime( const vector<String> & ); //Used to change certain system time related settings. No args returns current time.
 	void parseEEPROMCfg( vector<String> ); //Used to program specific values into the EEPROM for non-volatile storage (default wifi connection, so on)
 	//
 	
 	void Process(); //This basically functions as our loop function
+	void updateClock(); //Updates device timer settings
 	void setup(); //Setup functions to be called when device inits.
 	void setupServer(); //Links specific web server address to corresponding page generation functions.
-	void beginConnection( String, String ); //Used to connect to an existing wireless network.
+	void beginConnection( const String &, const String & ); //Used to connect to an existing wireless network.
 	void closeConnection( bool = true ); //Used to close all connections to the ESP device.
-	void sendMessage( String, bool = false ); //This prepares 
+	void sendMessage( const String &, uint8_t = PRIORITY_LOW ); //This prepares the inputted string for serial transmission, if applicable. 
 	void printDiag(); //Used to display current connection information for the wifi device.
 	
 	//These functions handle the generation of HTML pages t be transmitted to users
@@ -60,18 +61,46 @@ public:
 	void HandleConfig(); //Device config (possibly user specific configs loaded from SQL (if available ?) ) 
 	void HandleLogin(); //User (student) login page.
 	void HandleAdmin(); //Administration page (instructor page)
+	
+	void CreateConfigFields(); //Create static data fields for page.
+	void CreateAdminFields(); //Create static data fields for page.
+	
+	void ProcessAdminSettings(); //Process post requests
+	void ProcessConfigSettings(); //Process posts requests
 	//
+	
+	bool CheckUpdateNIST(); //Used to determine if a NIST server check should be performed.
+	bool UpdateNIST( bool = false ); //Used to perform the NIST update.
 
 private:
-	bool b_attemptingConnection;
-	bool b_verboseMode; //Used to determine what messages should be sent over the serial channel
+	String s_NISTServer;
+	uint8_t i_verboseMode; //Used to determine what messages should be sent over the serial channel
 	vector <DataField *> p_dataFields;
-	wl_status_t currentStatus;
 	ESP8266WebServer *p_server;
 	uint8_t i_timeoutLimit;
+	char c_uniqueID[16]; //Unique ID string for device. 
+	
+	//System Clock variables
+	uint8_t i_second,
+			i_minute,
+			i_hour,
+			i_day,
+			i_month,
+			i_year,
+			i_timeZone; 
+			
+	uint8_t i_lastUpdateSecond;
+	//
+	
+	//NIST time variables
+	unsigned int i_NISTupdateFreq; //in minutes
+	unsigned long i_lastNISTupdate; //in minutes;
+	//
+	
+	bool b_enableNIST;
 };
 
+long parseInt( const String &str );
 
-long parseInt( String str );
 
 #endif /* ESPCOMM_H_ */

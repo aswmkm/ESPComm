@@ -58,7 +58,6 @@ class DataField
 	String s_fieldName; //Used for POST/GET methods.
 	String s_fieldValue; //This is the data being displayed within the form (default text in a text-box for example)
 	String s_fieldLabel;
-	
 };
 
 

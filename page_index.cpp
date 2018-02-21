@@ -39,7 +39,7 @@ const char HTML_FOOTER[] PROGMEM =
 "</FORM>";
 */
 
-void ESPComm::HandleIndex()
+void ESPComm::HandleIndex() //Generate the HTML for our main page.
 {	  
 	String HTML = String(HTML_HEADER);
 	HTML += "<title>Device ID Here:</title>"; //Page title

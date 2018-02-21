@@ -18,7 +18,7 @@ void ESPComm::parseSerialData()
 	if ( Serial.available() ) //Have something in the serial buffer?
 	{
 		Serial.readBytesUntil( NULL_CHAR, buffer, MAX_BUFFERSIZE - 1 ); //read into the buffer.
-		uint8_t length = strlen(buffer); 
+		uint8_t length = strlen(buffer);
 		for ( int pos = 0; pos < length ; pos++ )
 		{
 			if ( buffer[pos] == NULL_CHAR )
@@ -54,14 +54,16 @@ void ESPComm::parseSerialData()
 						scanNetworks();
 						break;
 					case CMD_AP: //Telling the ESP to become an access point "name":"password"
-						if( !parseAccessPoint( parseArgs( pos, length, buffer ) ) )
-							sendMessage("Failed to create access point.", true );
+						parseAccessPoint( parseArgs( pos, length, buffer ) );
 						break;
 					case CMD_VERBOSE: //Enable/disable verbose mode
 						parseVerbose( parseArgs( pos, length, buffer ) );
 						break;
 					case CMD_NETINFO: //Status
 						printDiag();
+						break;
+					case CMD_TIME:
+						parseTime( parseArgs( pos, length, buffer ) );
 						break;
 					default:
 						continue; //Nothing here? just skip it.
@@ -114,20 +116,18 @@ vector<String> ESPComm::parseArgs( int &pos, const uint8_t &len, const char buff
 	return args;
 }
 
-bool ESPComm::parseAccessPoint( vector<String> args )
+bool ESPComm::parseAccessPoint( const vector<String> &args )
 {
 	//<SSID>:<Password>
 	if ( args.size() >= 2 ) //Make sure they exist, prevent crashing
 		return setupAccessPoint( args[0], args[1] ); //Any other args will be discarded (not used)
-	else 
-	{
-		sendMessage( "Not enough arguments to initialize access point.", true );
+	else
+		sendMessage( "Not enough arguments to initialize access point.", PRIORITY_HIGH );
 		return false;
-	}
 }
 
 //For connecting to a wifi network, must be currently disconnected before connecting to a new network
-void ESPComm::parseConnect( vector<String> args )
+void ESPComm::parseConnect( const vector<String> &args )
 {
 	//<SSID>:<Password>:<special mode>
 	if ( args.size() >= 2 ) //Minimum args.
@@ -140,7 +140,7 @@ void ESPComm::parseConnect( vector<String> args )
 				int8_t indexes = WiFi.scanComplete();
 				if ( !ssidIndex || indexes <= 0 || ssidIndex > indexes )
 				{
-					sendMessage("Invalid SSID index: " + String(ssidIndex), true );
+					sendMessage("Invalid SSID index: " + String(ssidIndex), PRIORITY_HIGH );
 					return;
 				}
 				beginConnection( WiFi.SSID(ssidIndex), args[1] );
@@ -160,11 +160,11 @@ void ESPComm::parseConnect( vector<String> args )
 							return;
 						}
 					}
-					sendMessage("No valid SSID match found using wild-card.");
+					sendMessage("No valid SSID match found using wild-card.", PRIORITY_HIGH );
 					return;
 				}
 				else
-					sendMessage("Scan returned no available networks, cannot connect via wild-card." );
+					sendMessage("Scan returned no available networks, cannot connect via wild-card.", PRIORITY_HIGH  );
 				
 				return; //if we've made it this far, we're probably going nowhere. just end.
 			}	
@@ -173,24 +173,29 @@ void ESPComm::parseConnect( vector<String> args )
 		beginConnection( args[0], args[1] ); //Normal connection method
 	}
 	else
-		sendMessage("Not enough arguments to connect to network.", true );
+		sendMessage("Not enough arguments to connect to network.", PRIORITY_HIGH );
 }
 
-void ESPComm::parseVerbose( vector<String> args )
+void ESPComm::parseVerbose( const vector<String> &args )
 {
-	if ( args.size() > 0 ) //Make sure we've got some data.
+	if ( args.size() ) //Make sure we've got some data.
 	{ 
 		uint8_t value = parseInt( args[0] ); //See if we have a numeric value 
-		args[0].toLowerCase(); //Convert all chars to lower case for comparison purposes.
-		
-		if ( value || args[0] == "on" )//Greater than 0 or specified "on"
-			b_verboseMode = true;
+		if ( value )
+		{
+			if ( value > VERBOSE_MAX )
+				value = VERBOSE_MAX; //cap
+				
+			i_verboseMode = value;
+		}
+		else if ( args[0] == "on" )// specified "on" - just default to show all messages
+			i_verboseMode = PRIORITY_LOW;
 		else if ( !value || args[0] == "off" )
-			b_verboseMode = false;
+			i_verboseMode = 0;
 	}
 }
 
-void ESPComm::parseDataFields( vector<String> args ) // /f<address><type_num><Label Text*><method name*><default value text*>
+void ESPComm::parseDataFields( const vector<String> &args ) // /f<address><type_num><Label Text*><method name*><default value text*>
 {	
 	if ( args.size() >= 2 )	//Must have at least 2 fields.
 	{
@@ -210,7 +215,7 @@ void ESPComm::parseDataFields( vector<String> args ) // /f<address><type_num><La
 						sendMessage("Field: " + String(address) + " removed." );
 					}
 					else
-						sendMessage("Address detected in existing data field."); //duplicate address being created
+						sendMessage("Address detected in existing data field.", PRIORITY_HIGH ); //duplicate address being created
 						
 					return; //Die here.
 				}
@@ -249,29 +254,33 @@ void ESPComm::parseDataFields( vector<String> args ) // /f<address><type_num><La
 		sendMessage("Not enough valid arguments to create new data field.");
 }
 
-void ESPComm::parseUpdate( vector<String> args ) // /u<Index><Data>
+void ESPComm::parseUpdate( const vector<String> &args ) // /u<Index><Data>
 {
-	if ( args.size() >= 2 ) //For now, other args are discarded.
+	uint8_t totalArgs = args.size();
+	if ( totalArgs >= 2 ) //For now, other args are discarded.
 	{
-		int address = parseInt( args[0] );
-		
-		if ( address ) //Must be a non zero value.
+		for (uint8_t x = 0; x < totalArgs; x++ )
 		{
-			for ( uint8_t x = 0; x < p_dataFields.size(); x++ )
+			int address = parseInt( args[x] );
+			if ( address && totalArgs >= (x+1) )
 			{
-				if ( p_dataFields[x]->GetAddress() == address )
+				x++;
+				for ( uint8_t i = 0; i < p_dataFields.size(); i++ )
 				{
-					p_dataFields[x]->SetFieldValue( args[1] ); //Set the new data
-					return; //End here.
+					if ( p_dataFields[i]->GetAddress() == address )
+					{
+						p_dataFields[i]->SetFieldValue( args[x] ); //Set the new data
+						return; //End here.
+					}
 				}
+				sendMessage("Failed to make any update to field with index: " + String(address) );
 			}
-			sendMessage("Failed to make any update to field with index: " + String(address) );
 		}
 	}
 	sendMessage("Not enough valid arguments for update.");
 }
 
-long parseInt( String str )
+long parseInt( const String &str )
 {
 	String tempstr;
 	for ( int x = 0; x < str.length(); x++ )
@@ -279,14 +288,67 @@ long parseInt( String str )
 		char tempChar = str.charAt(x);
 		
 		if ( tempChar > 47 && tempChar < 58 || tempChar == 45 )//only add number chars to the string, also the negative sign
-			tempstr.concat( tempChar );
+		tempstr.concat( tempChar );
 	}
 	
 	return tempstr.toInt(); //Will return 0 if buffer does not contain data. (safe)
 }
 
 
-void ESPComm::parseEEPROMCfg( vector<String> )
+void ESPComm::parseEEPROMCfg( vector<String> args )
 {
 	
+}
+
+void ESPComm::parseTime( const vector<String> &args )
+{
+	uint8_t totalArgs = args.size();
+		
+	if ( totalArgs )
+	{
+		for ( uint8_t x = 0; x < totalArgs; x++ )
+		{
+			if ( args[x] == "n" && totalArgs >= (x+1) ) //enabledisable
+			{
+				x++; //Move to next element.
+				uint8_t value = parseInt( args[x] );
+				if ( value )
+					b_enableNIST = true;
+				else
+					b_enableNIST = false;
+			}
+			else if ( args[x] == "u" ) //forced update
+			{
+				if ( !UpdateNIST(true) )
+				sendMessage("Failed to update NIST time.");
+			}
+			else if ( args[x] == "f" && totalArgs >= (x+1) ) //frequency
+			{
+				x++; //Move to next element.
+				i_NISTupdateFreq = parseInt( args[x] );
+			}
+			else if ( args[x] == "s" && totalArgs >= (x+1) ) //nist server name/ip
+			{
+				x++; //Move to next element.
+				s_NISTServer = args[x];
+			}
+			else if ( args[x] == "t" && totalArgs >= (x+6) ) //manual time entry (requires year, month, day, hour, min, and sec)
+			{
+				i_year = parseInt( args[x + 1] );
+				i_month = parseInt( args[x + 2] );
+				i_day = parseInt( args[x + 3] );
+				i_hour = parseInt( args[x + 4] );
+				i_minute = parseInt( args[x + 5] );
+				i_second = parseInt( args[x + 6] );
+				x += 6; //advance
+			}
+			else if ( args[x] == "z" && totalArgs >= (x+1) ) //zone
+			{
+				x++;
+				i_timeZone = parseInt( args[x] );
+			}
+			else
+				sendMessage( i_year + String(":") + i_month + String(":") + i_day + String(":") + i_hour + String(":") + i_minute + String(":") + i_second, PRIORITY_HIGH );
+		}
+	}	
 }
