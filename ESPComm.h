@@ -8,6 +8,7 @@
 
 #include "common.h"
 #include "data_fields.h" 
+#include "time.h"
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
 #include <DNSServer.h>
@@ -28,7 +29,6 @@ class ESPComm
 public:
 	ESPComm()
 	{	
-		i_second = i_minute = i_hour = i_day = i_month = i_year = i_lastNISTupdate = 0; //Init to 0
 	}
 	
 	void scanNetworks(); //Used to output to serial that gives detains on various available networks.
@@ -80,21 +80,16 @@ private:
 	uint8_t i_timeoutLimit;
 	char c_uniqueID[16]; //Unique ID string for device. 
 	
-	//System Clock variables
-	uint8_t i_second,
-			i_minute,
-			i_hour,
-			i_day,
-			i_month,
-			i_year,
-			i_timeZone; 
+	//System Clock objects
+	Time *p_currentTime;
+	Time *p_nextNISTUpdateTime; //Used to store the time for next NIST update.
 			
 	uint8_t i_lastUpdateSecond;
 	//
 	
 	//NIST time variables
-	unsigned int i_NISTupdateFreq; //in minutes
-	unsigned long i_lastNISTupdate; //in minutes;
+	unsigned int i_NISTupdateFreq; //frequency of NIST time update
+	uint8 i_NISTUpdateUnit; //Unit of time for frequency between updates.
 	//
 	
 	bool b_enableNIST;

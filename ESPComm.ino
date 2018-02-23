@@ -9,6 +9,7 @@ ESP8266 Arduino code example
 #include <vector>
 #include "ESPComm.h"
 #include "user_interface.h"
+#include "time.h"
 
 WiFiClient client;
 MySQL_Connection SQL_Connection((Client *)&client);
@@ -35,10 +36,13 @@ void ESPComm::setup()
 {
 	//Init our objects here.
 	setupServer(); //Set up the web hosting directories.
+	p_currentTime = new Time;
+	p_nextNISTUpdateTime = new Time;
 	i_verboseMode = PRIORITY_LOW; //Do this by default for now, will probably have an eeprom setting for this later.
 	i_timeoutLimit = 15; //20 second default, will probably be an eeprom config later
 	b_enableNIST = true;
-	i_NISTupdateFreq = 1; //default to 1 minute for now.
+	i_NISTupdateFreq = 5; //default to 5 minutes for now.
+	i_NISTUpdateUnit = TIME_MINUTE; //default for now
 	s_NISTServer = "time.nist.gov"; //Default for now.
 }
 
@@ -46,7 +50,7 @@ void ESPComm::Process()
 {
 	parseSerialData(); //parse all incoming serial data.
 	
-	if ( WiFi.status() == WL_CONNECTED || WiFi.softAPgetStationNum() ) //Only do this stuff if we're connected to a network, or a client has connected
+	if ( WiFi.status() == WL_CONNECTED || WiFi.softAPgetStationNum() ) //Only do this stuff if we're connected to a network, or a client has connected to the AP
 	{
 		p_server->handleClient(); //Process stuff for clients that have connected.
 	}
@@ -244,48 +248,7 @@ void ESPComm::updateClock()
 		return;
 		
 	//System clock increase below.
-	i_second++;
-	if ( !(i_second%60) )
-	{
-		i_second = 0;
-		i_minute++;
-		if ( !(i_minute%60) )
-		{
-			i_minute = 0;
-			i_hour++;
-			if ( !(i_hour%24) )
-			{
-				i_hour = 0;
-				i_day++;
-				uint8_t mod = 0; //variable modulus
-				switch( i_month )
-				{
-					case 4:
-					case 6:
-					case 9:
-					case 11:
-						mod = 30;
-						break;
-					case 2:
-						mod = 28;
-						break;
-					default: //all others
-						mod = 31;
-						break;
-				}
-				if ( !(i_day%mod) )
-				{
-					i_day = 0;
-					i_month++;
-					if ( !(i_month%12) )
-					{
-						i_month = 0;
-						i_year++; //We don't roll over years.
-					}
-				}
-			}
-		}
-	}
+	p_currentTime->IncrementTime( 1, TIME_SECOND );//1 second at a time.
 }
 
 bool ESPComm::UpdateNIST( bool force ) //TODO -- NTP?
@@ -295,20 +258,8 @@ bool ESPComm::UpdateNIST( bool force ) //TODO -- NTP?
 		if ( !i_NISTupdateFreq && !force ) //must be a non-zero value
 			return false;
 		
-		unsigned long currentTime = i_minute; //we're basing this on minutes
-		if ( i_hour )
-			currentTime *= i_hour;
-		if ( i_day )
-			currentTime *= i_day;
-		if ( i_month )
-			currentTime *= i_month;
-		if ( i_year )
-			currentTime *= i_year;
-		
-		if ( currentTime < ( i_lastNISTupdate + i_NISTupdateFreq ) && !force ) //too soon for an update?
+		if ( p_currentTime->IsBehind( p_nextNISTUpdateTime ) && !force ) //too soon for an update?
 			return false;
-		else 
-			i_lastNISTupdate = currentTime;
 		
 		WiFiClient NISTclient;
 		const uint8_t httpPort = 13;
@@ -323,8 +274,10 @@ bool ESPComm::UpdateNIST( bool force ) //TODO -- NTP?
 				return false;
 			}
 			retries++;
+			delay(100); //small delay to allow the server to respond
 		}
 		sendMessage("Updating time.");
+		
 		delay(100); //small delay to allow the server to respond
 			
 		while( NISTclient.available() )
@@ -334,14 +287,15 @@ bool ESPComm::UpdateNIST( bool force ) //TODO -- NTP?
 				return false; //to be safe
 					
 			//Break the string down into its components, then save.
-			i_year = line.substring(7, 9).toInt();
-			i_month = line.substring(10, 12).toInt();
-			i_day= line.substring(13, 15).toInt();
-			i_hour = line.substring(16, 18).toInt();
-			i_minute = line.substring(19, 21).toInt();
-			i_second = line.substring(22, 24).toInt();
+			if ( !p_currentTime->SetTime( line.substring(7, 9).toInt(), line.substring(10, 12).toInt(), line.substring(13, 15).toInt(),
+			 line.substring(16, 18).toInt(), line.substring(19, 21).toInt(), line.substring(22, 24).toInt() ) )
+				return false;
+				
+			p_nextNISTUpdateTime->SetTime( p_currentTime ); //Replace with current time
 		}
-			
+		
+		p_nextNISTUpdateTime->IncrementTime( i_NISTupdateFreq, i_NISTUpdateUnit );
+		
 		return true; //End here, we'll let the system clock carry on on the next second.
 	}
 	return false; //default path

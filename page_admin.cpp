@@ -8,9 +8,15 @@
 
  #include "ESPComm.h" 
  
+ DataField *resourceField,
+		   *htmlRefreshField,
+		   *sqlHostname,
+		   *sqlPort,
+		   *autoSQLLogFIeld,
+		   *autoSQLLogIntervalField; 
+ 
 void ESPComm::CreateAdminFields()
 {
-	DataField verboseField( 1, TYPE_INPUT_CHECKBOX, "Verbose Mode (Web)", "verbose_web", "checked" ); //Default as checked?
 	DataField resourceField( 2, TYPE_INPUT_CHECKBOX, "Verbose Mode (Serial)", "verbose_serial", "checked" );
 	DataField htmlRefreshField( 3, TYPE_INPUT_TEXT, "Page Refresh Interval (Seconds)", "refresh", "3" ); //Number of seconds between automatic page refresh 0 = disabled
 	DataField autoSQLLogField( 4, TYPE_INPUT_CHECKBOX, "Auto Log to SQL Server", "autolog", "checked" );

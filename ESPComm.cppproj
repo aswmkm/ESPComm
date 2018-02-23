@@ -81,7 +81,7 @@
       <Value>C:/Users/Andrew/AppData/Local/arduino15/packages/esp8266/hardware/esp8266/2.4.0/cores/esp8266/umm_malloc</Value>
       <Value>C:/Users/Andrew/AppData/Local/arduino15/packages/esp8266/hardware/esp8266/2.4.0/variants/generic</Value>
       <Value>C:/Users/Andrew/AppData/Local/arduino15/packages/esp8266/hardware/esp8266/2.4.0/tools/sdk/include</Value>
-      <Value>C:/Users/Andrew/AppData/Local/arduino15/packages/esp8266/hardware/esp8266/2.4.0/tools/sdk/lwip2/include</Value>
+      <Value>C:/Users/Andrew/AppData/Local/arduino15/packages/esp8266/hardware/esp8266/2.4.0/tools/sdk/lwip/include</Value>
       <Value>C:/Users/Andrew/AppData/Local/arduino15/packages/esp8266/hardware/esp8266/2.4.0/tools/sdk/libc/xtensa-lx106-elf/include</Value>
       <Value>C:/Users/Andrew/AppData/Local/arduino15/packages/esp8266/tools/xtensa-lx106-elf-gcc/1.20.0-26-gb404fb9-2/xtensa-lx106-elf/include/c++/4.8.2</Value>
       <Value>C:/Users/Andrew/AppData/Local/arduino15/packages/esp8266/tools/xtensa-lx106-elf-gcc/1.20.0-26-gb404fb9-2/xtensa-lx106-elf/include/c++/4.8.2/xtensa-lx106-elf</Value>
@@ -127,7 +127,7 @@
       <Value>C:/Users/Andrew/AppData/Local/arduino15/packages/esp8266/hardware/esp8266/2.4.0/cores/esp8266/umm_malloc</Value>
       <Value>C:/Users/Andrew/AppData/Local/arduino15/packages/esp8266/hardware/esp8266/2.4.0/variants/generic</Value>
       <Value>C:/Users/Andrew/AppData/Local/arduino15/packages/esp8266/hardware/esp8266/2.4.0/tools/sdk/include</Value>
-      <Value>C:/Users/Andrew/AppData/Local/arduino15/packages/esp8266/hardware/esp8266/2.4.0/tools/sdk/lwip2/include</Value>
+      <Value>C:/Users/Andrew/AppData/Local/arduino15/packages/esp8266/hardware/esp8266/2.4.0/tools/sdk/lwip/include</Value>
       <Value>C:/Users/Andrew/AppData/Local/arduino15/packages/esp8266/hardware/esp8266/2.4.0/tools/sdk/libc/xtensa-lx106-elf/include</Value>
       <Value>C:/Users/Andrew/AppData/Local/arduino15/packages/esp8266/tools/xtensa-lx106-elf-gcc/1.20.0-26-gb404fb9-2/xtensa-lx106-elf/include/c++/4.8.2</Value>
       <Value>C:/Users/Andrew/AppData/Local/arduino15/packages/esp8266/tools/xtensa-lx106-elf-gcc/1.20.0-26-gb404fb9-2/xtensa-lx106-elf/include/c++/4.8.2/xtensa-lx106-elf</Value>
@@ -626,7 +626,7 @@ build.arch=ESP8266
       <Value>C:/Users/Andrew/AppData/Local/arduino15/packages/esp8266/hardware/esp8266/2.4.0/cores/esp8266/umm_malloc</Value>
       <Value>C:/Users/Andrew/AppData/Local/arduino15/packages/esp8266/hardware/esp8266/2.4.0/variants/generic</Value>
       <Value>C:/Users/Andrew/AppData/Local/arduino15/packages/esp8266/hardware/esp8266/2.4.0/tools/sdk/include</Value>
-      <Value>C:/Users/Andrew/AppData/Local/arduino15/packages/esp8266/hardware/esp8266/2.4.0/tools/sdk/lwip2/include</Value>
+      <Value>C:/Users/Andrew/AppData/Local/arduino15/packages/esp8266/hardware/esp8266/2.4.0/tools/sdk/lwip/include</Value>
       <Value>C:/Users/Andrew/AppData/Local/arduino15/packages/esp8266/hardware/esp8266/2.4.0/tools/sdk/libc/xtensa-lx106-elf/include</Value>
       <Value>C:/Users/Andrew/AppData/Local/arduino15/packages/esp8266/tools/xtensa-lx106-elf-gcc/1.20.0-26-gb404fb9-2/xtensa-lx106-elf/include/c++/4.8.2</Value>
       <Value>C:/Users/Andrew/AppData/Local/arduino15/packages/esp8266/tools/xtensa-lx106-elf-gcc/1.20.0-26-gb404fb9-2/xtensa-lx106-elf/include/c++/4.8.2/xtensa-lx106-elf</Value>
@@ -672,7 +672,7 @@ build.arch=ESP8266
       <Value>C:/Users/Andrew/AppData/Local/arduino15/packages/esp8266/hardware/esp8266/2.4.0/cores/esp8266/umm_malloc</Value>
       <Value>C:/Users/Andrew/AppData/Local/arduino15/packages/esp8266/hardware/esp8266/2.4.0/variants/generic</Value>
       <Value>C:/Users/Andrew/AppData/Local/arduino15/packages/esp8266/hardware/esp8266/2.4.0/tools/sdk/include</Value>
-      <Value>C:/Users/Andrew/AppData/Local/arduino15/packages/esp8266/hardware/esp8266/2.4.0/tools/sdk/lwip2/include</Value>
+      <Value>C:/Users/Andrew/AppData/Local/arduino15/packages/esp8266/hardware/esp8266/2.4.0/tools/sdk/lwip/include</Value>
       <Value>C:/Users/Andrew/AppData/Local/arduino15/packages/esp8266/hardware/esp8266/2.4.0/tools/sdk/libc/xtensa-lx106-elf/include</Value>
       <Value>C:/Users/Andrew/AppData/Local/arduino15/packages/esp8266/tools/xtensa-lx106-elf-gcc/1.20.0-26-gb404fb9-2/xtensa-lx106-elf/include/c++/4.8.2</Value>
       <Value>C:/Users/Andrew/AppData/Local/arduino15/packages/esp8266/tools/xtensa-lx106-elf-gcc/1.20.0-26-gb404fb9-2/xtensa-lx106-elf/include/c++/4.8.2/xtensa-lx106-elf</Value>
@@ -1158,6 +1158,12 @@ build.arch=ESP8266
       <SubType>compile</SubType>
     </Compile>
     <Compile Include="parser.cpp">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="time.cpp">
+      <SubType>compile</SubType>
+    </Compile>
+    <Compile Include="time.h">
       <SubType>compile</SubType>
     </Compile>
     <Compile Include="__vm\.ESPComm-GIT.vsarduino.h">

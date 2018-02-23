@@ -334,21 +334,17 @@ void ESPComm::parseTime( const vector<String> &args )
 			}
 			else if ( args[x] == "t" && totalArgs >= (x+6) ) //manual time entry (requires year, month, day, hour, min, and sec)
 			{
-				i_year = parseInt( args[x + 1] );
-				i_month = parseInt( args[x + 2] );
-				i_day = parseInt( args[x + 3] );
-				i_hour = parseInt( args[x + 4] );
-				i_minute = parseInt( args[x + 5] );
-				i_second = parseInt( args[x + 6] );
+				p_currentTime->SetTime(parseInt(args[x + 1]), parseInt(args[x + 2]), parseInt(args[x + 3]), parseInt(args[x + 4]), parseInt(args[x + 5]), parseInt(args[x + 6]) );
 				x += 6; //advance
 			}
 			else if ( args[x] == "z" && totalArgs >= (x+1) ) //zone
 			{
 				x++;
-				i_timeZone = parseInt( args[x] );
+				p_currentTime->SetTimeZone(parseInt( args[x] ));
 			}
 			else
-				sendMessage( i_year + String(":") + i_month + String(":") + i_day + String(":") + i_hour + String(":") + i_minute + String(":") + i_second, PRIORITY_HIGH );
+				sendMessage( p_currentTime->GetTimeStr(), PRIORITY_HIGH );
 		}
 	}	
 }
+

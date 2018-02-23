@@ -60,5 +60,14 @@ class DataField
 	String s_fieldLabel;
 };
 
+class DataTable //This class is basically used to create sections for specific types of inputs, like SQL settings, or Time settings, etc.
+{
+	public:
+	void SetTableName( String );
+	void GenerateTableHTML();
+	private: 
+	String s_tableName;
+	vector<DataField *> p_fields; //vector containing the pointers to all of our data fields.
+};
 
 #endif /* DATA_FIELDS_H_ */
