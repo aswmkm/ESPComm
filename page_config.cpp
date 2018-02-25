@@ -8,28 +8,22 @@
 
 #include "ESPComm.h"
 
-void ESPComm::CreateConfigFields()
-{
-	
-}
   
 void ESPComm::HandleConfig()
 {
-	//Something to handle login stuff and maybe admin overrides? 
+	String HTML = String(HTML_HEADER);
+	HTML += PSTR("<title>Device: ") + s_uniqueID + PSTR(" User Config Page</title>"); //Page title
 	
-	DataField verboseField( 1, TYPE_INPUT_CHECKBOX, "Verbose Mode (Web)", "verbose_web", "checked" ); //Default as checked?
-	DataField resourceField( 2, TYPE_INPUT_CHECKBOX, "Verbose Mode (Serial)", "verbose_serial", "checked" );
-	DataField htmlRefreshField( 3, TYPE_INPUT_TEXT, "Page Refresh Interval (Seconds)", "refresh", "3" ); //Number of seconds between automatic page refresh 0 = disabled
+	if ( p_server->args() ) //Do we have some args to input? Apply settings if so.
+		ProcessDeviceSettings();
 	
+	HTML += F("<FORM action=\"./config\" method=\"post\">");
 	
-	DataField autoSQLLogField( 4, TYPE_INPUT_CHECKBOX, "Auto Log to SQL Server", "autolog", "checked" );
-	DataField autoSQLLogIntervalField( 5, TYPE_INPUT_TEXT, "SQL Log Interval", "loginterval", "5" );
+	for ( uint8_t x = 0; x < p_configDataTables.size(); x++ )
+		HTML += p_configDataTables[x]->GenerateTableHTML(); //Add each datafield table to the HTML body
 	
-	p_server->send(200, "text/html", "This is the config page." );
-}
-
-void ESPComm::ProcessConfigSettings()
-{
-	
+	HTML += F("</FORM>");
+	HTML += String(HTML_FOOTER); //Add the footer stuff.
+	p_server->send(200, "text/html", HTML );
 }
   

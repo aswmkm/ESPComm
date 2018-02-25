@@ -62,28 +62,37 @@ public:
 	void HandleLogin(); //User (student) login page.
 	void HandleAdmin(); //Administration page (instructor page)
 	
-	void CreateConfigFields(); //Create static data fields for page.
 	void CreateAdminFields(); //Create static data fields for page.
 	
-	void ProcessAdminSettings(); //Process post requests
-	void ProcessConfigSettings(); //Process posts requests
+	void ProcessDeviceSettings(); //Located in page_admin.cpp, shared with page_config
 	//
 	
 	bool CheckUpdateNIST(); //Used to determine if a NIST server check should be performed.
 	bool UpdateNIST( bool = false ); //Used to perform the NIST update.
 
 private:
-	String s_NISTServer;
-	uint8_t i_verboseMode; //Used to determine what messages should be sent over the serial channel
-	vector <DataField *> p_dataFields;
+	
+	vector <DataField *> p_dataFields; //These are the data fields to be displayed on the index.
+	vector <DataTable *> p_configDataTables; //Organizatioal datafield tables for the config/admin pages
+	
+	DataField *p_EEPROMSubmit; //Checkbox that enables/disables the saving of configs to the system EEPROM
+	DataField *p_configSubmit; //Submit button for configs 
+	
 	ESP8266WebServer *p_server;
+	
 	uint8_t i_timeoutLimit;
-	char c_uniqueID[16]; //Unique ID string for device. 
+	uint8_t i_verboseMode; //Used to determine what messages should be sent over the serial channel
+	
+	String s_uniqueID; //Unique ID string for device. 
+	String s_apSSID; //SSID for AP mode  broadcast.
+	String s_apPWD; //Password to connect to AP
 	
 	//System Clock objects
 	Time *p_currentTime;
 	Time *p_nextNISTUpdateTime; //Used to store the time for next NIST update.
-			
+	
+	String s_NISTServer;
+	unsigned int i_NISTPort;
 	uint8_t i_lastUpdateSecond;
 	//
 	
@@ -92,7 +101,8 @@ private:
 	uint8 i_NISTUpdateUnit; //Unit of time for frequency between updates.
 	//
 	
-	bool b_enableNIST;
+	bool b_enableNIST; //Enable time server update mode?
+	bool b_enableAP; //Enable access point mode?
 };
 
 long parseInt( const String &str );

@@ -11,21 +11,6 @@
 
 #include "ESPComm.h"
   
-const char HTML_HEADER[] PROGMEM =
-"<!DOCTYPE HTML>"
-"<html>"
-"<head>"
-"<meta name = \"viewport\" content = \"width = device-width, initial-scale = 1.0, maximum-scale = 1.0, user-scalable=0\">"
-"<meta http-equiv=\"refresh\" content=\"3\" />"
-"<style>"
-"\"body { background-color: #808080; font-family: Arial, Helvetica, Sans-Serif; Color: #000000; }\""
-"</style>"
-"</head>"
-"<body>";
-
-const char HTML_FOOTER[] PROGMEM = 
-"</body>"
-"</html>";
 /*
 
 "<h1>ESP8266 Web Form Demo</h1>" //Custom section names later?
@@ -47,9 +32,8 @@ void ESPComm::HandleIndex() //Generate the HTML for our main page.
 	HTML += "<FORM action=\"/\" method=\"post\">";
 	HTML += "<P>";
 	for ( uint8_t x = 0; x < p_dataFields.size(); x++ )
-	{
 		HTML += p_dataFields[x]->GenerateHTML(); //Add each datafield to the HTML body
-	}
+		
 	HTML += "</P>";
 	HTML += "</FORM>";
 	HTML += String(HTML_FOOTER); //Add the footer stuff.

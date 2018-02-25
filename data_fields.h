@@ -22,6 +22,7 @@
 #define TYPE_INPUT_TEXT 2
 #define TYPE_INPUT_SUBMIT 3
 #define TYPE_INPUT_CHECKBOX 4
+#define TYPE_INPUT_PASSWORD 5
 
 #define TYPE_OUTPUT_TEXT 10
 
@@ -29,25 +30,48 @@
 #define METHOD_POST 1
 #define METHOD_GET 2
 
+const char HTML_HEADER[] PROGMEM =
+"<!DOCTYPE HTML>"
+"<html>"
+"<head>"
+"<meta name = \"viewport\" content = \"width = device-width, initial-scale = 1.0, maximum-scale = 1.0, user-scalable=0\">"
+//"<meta http-equiv=\"refresh\" content=\"3\" />"
+"<style>"
+"\"body { background-color: #808080; font-family: Arial, Helvetica, Sans-Serif; Color: #000000; }\""
+"</style>"
+"</head>"
+"<body>";
+
+const char HTML_FOOTER[] PROGMEM =
+"</body>"
+"</html>";
+
 class DataField
 {
 	public:
-	DataField( int address, uint8_t type, String fieldLabel = "", String fieldName = "", String defaultValue = "" )
+	DataField( int address, uint8_t type, const String &fieldLabel = "", const String &fieldName = "", const String &defaultValue = "", bool newLine = true )
 	{
 		i_Address = address;
 		i_Type = type;
 		SetFieldName( fieldName );
 		SetFieldLabel( fieldLabel );
 		SetFieldValue( defaultValue );
+		b_enabled = true;
+		b_visible = true;
+		b_newLine = newLine;
 	}
+	bool IsEnabled(){ return b_enabled; }
+	bool IsVisible(){ return b_visible; }
 	int GetAddress() { return i_Address; } //returns the address of the field (Used to make sure we're updating the proper field)
 	uint8_t GetType() { return i_Type; } //Returns the field type (used for the generation of the HTML code)
-	void SetFieldName( String ); //This sets the name for the field.
-	void SetFieldValue( String ); //This is used for setting the data within the field.
-	void SetFieldLabel( String ); //Used to set text label for field (if applicable)
-	String GetFieldName() { return s_fieldName; }
-	String GetFieldValue() { return s_fieldValue; }
-	String GetFieldLabel() { return s_fieldLabel; }
+	void SetFieldName( const String & ); //This sets the name for the field.
+	void SetFieldValue( const String & ); //This is used for setting the data within the field.
+	void SetFieldLabel( const String & ); //Used to set text label for field (if applicable)
+	void SetVisible( bool vis ){ b_visible = vis; }
+	void SetEnabled( bool en ){ b_enabled = en; }
+	const String &GetFieldName() { return s_fieldName; }
+	const String &GetFieldValue() { return s_fieldValue; }
+	const String &GetFieldLabel() { return s_fieldLabel; }
 	String GenerateHTML(); //Used to create the HTML to be appended to the body of the web page.
 	
 	private:
@@ -57,16 +81,34 @@ class DataField
 	int i_Address; //Represents the address number used for updating values in the field.	
 	String s_fieldName; //Used for POST/GET methods.
 	String s_fieldValue; //This is the data being displayed within the form (default text in a text-box for example)
-	String s_fieldLabel;
+	String s_fieldLabel; //Text that describes the field
+	
+	bool b_enabled; //Is this field enabled? 
+	bool b_visible; //Is it visible in user config page? (REDUNDANT WITH ENABLE?)
+	bool b_newLine; //Generate a newline in HTML following this Datafield.
 };
 
 class DataTable //This class is basically used to create sections for specific types of inputs, like SQL settings, or Time settings, etc.
 {
 	public:
-	void SetTableName( String );
-	void GenerateTableHTML();
+	DataTable( const String &name = "", const String &ID = "" )
+	{
+		s_tableName = name;
+		s_tableID = ID;
+	}
+	
+	void SetTableName( const String &name ) { s_tableName = name; }
+	String GenerateTableHTML(); //Generates the HTML for the Table.
+	bool RemoveElement( unsigned int );
+	bool AddElement( DataField * );
+	int8_t IteratorFromAddress( unsigned int ); //Used to search for an object with the inputted address. If that object is found, the position in the vector is returned, else -1
+	DataField *GetElementByID( unsigned int ); //Retrieves the element with the corresponding ID
+	DataField *GetElementByName( const String & ); //Get the element by its assigned name.
+	const vector<DataField *> &GetFields(){ return p_fields; }
+		
 	private: 
 	String s_tableName;
+	String s_tableID;
 	vector<DataField *> p_fields; //vector containing the pointers to all of our data fields.
 };
 

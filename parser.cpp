@@ -122,7 +122,7 @@ bool ESPComm::parseAccessPoint( const vector<String> &args )
 	if ( args.size() >= 2 ) //Make sure they exist, prevent crashing
 		return setupAccessPoint( args[0], args[1] ); //Any other args will be discarded (not used)
 	else
-		sendMessage( "Not enough arguments to initialize access point.", PRIORITY_HIGH );
+		sendMessage( PSTR("Not enough arguments to initialize access point."), PRIORITY_HIGH );
 		return false;
 }
 
@@ -140,7 +140,7 @@ void ESPComm::parseConnect( const vector<String> &args )
 				int8_t indexes = WiFi.scanComplete();
 				if ( !ssidIndex || indexes <= 0 || ssidIndex > indexes )
 				{
-					sendMessage("Invalid SSID index: " + String(ssidIndex), PRIORITY_HIGH );
+					sendMessage( "Invalid SSID index: " + String(ssidIndex), PRIORITY_HIGH );
 					return;
 				}
 				beginConnection( WiFi.SSID(ssidIndex), args[1] );
@@ -160,11 +160,11 @@ void ESPComm::parseConnect( const vector<String> &args )
 							return;
 						}
 					}
-					sendMessage("No valid SSID match found using wild-card.", PRIORITY_HIGH );
+					sendMessage( F("No valid SSID match found using wild-card."), PRIORITY_HIGH );
 					return;
 				}
 				else
-					sendMessage("Scan returned no available networks, cannot connect via wild-card.", PRIORITY_HIGH  );
+					sendMessage( F("Scan returned no available networks, cannot connect via wild-card."), PRIORITY_HIGH  );
 				
 				return; //if we've made it this far, we're probably going nowhere. just end.
 			}	
@@ -173,7 +173,7 @@ void ESPComm::parseConnect( const vector<String> &args )
 		beginConnection( args[0], args[1] ); //Normal connection method
 	}
 	else
-		sendMessage("Not enough arguments to connect to network.", PRIORITY_HIGH );
+		sendMessage( F("Not enough arguments to connect to network."), PRIORITY_HIGH );
 }
 
 void ESPComm::parseVerbose( const vector<String> &args )
@@ -215,7 +215,7 @@ void ESPComm::parseDataFields( const vector<String> &args ) // /f<address><type_
 						sendMessage("Field: " + String(address) + " removed." );
 					}
 					else
-						sendMessage("Address detected in existing data field.", PRIORITY_HIGH ); //duplicate address being created
+						sendMessage( F("Address detected in existing data field."), PRIORITY_HIGH ); //duplicate address being created
 						
 					return; //Die here.
 				}
@@ -245,13 +245,13 @@ void ESPComm::parseDataFields( const vector<String> &args ) // /f<address><type_
 	}
 	else if ( args.size() && args[0] == "*" && p_dataFields.size() ) //Print some diag info.
 	{
-		String tempStr = "Data Fields at Indexes: ";
+		String tempStr = F("Data Fields at Indexes: ");
 		for ( uint8_t x = 0; x < p_dataFields.size(); x++ )
 			tempStr += String( p_dataFields[x]->GetAddress() ) + ",";
 		sendMessage( tempStr );
 	}
 	else
-		sendMessage("Not enough valid arguments to create new data field.");
+		sendMessage( F("Not enough valid arguments to create new data field." ) );
 }
 
 void ESPComm::parseUpdate( const vector<String> &args ) // /u<Index><Data>
@@ -273,11 +273,11 @@ void ESPComm::parseUpdate( const vector<String> &args ) // /u<Index><Data>
 						return; //End here.
 					}
 				}
-				sendMessage("Failed to make any update to field with index: " + String(address) );
+				sendMessage( "Failed to make any update to field with index: " + String(address) );
 			}
 		}
 	}
-	sendMessage("Not enough valid arguments for update.");
+	sendMessage( F("Not enough valid arguments for update." ));
 }
 
 long parseInt( const String &str )
@@ -320,7 +320,7 @@ void ESPComm::parseTime( const vector<String> &args )
 			else if ( args[x] == "u" ) //forced update
 			{
 				if ( !UpdateNIST(true) )
-				sendMessage("Failed to update NIST time.");
+					sendMessage(F("Failed to update NIST time."));
 			}
 			else if ( args[x] == "f" && totalArgs >= (x+1) ) //frequency
 			{

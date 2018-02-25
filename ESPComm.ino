@@ -34,16 +34,26 @@ void loop()
 
 void ESPComm::setup()
 {
-	//Init our objects here.
+	//Init our objects/configs here.
 	setupServer(); //Set up the web hosting directories.
+	//Time object initialization
 	p_currentTime = new Time;
 	p_nextNISTUpdateTime = new Time;
+	//
+	
+	//Default stuff for now, until EEPROM loading is implemented
 	i_verboseMode = PRIORITY_LOW; //Do this by default for now, will probably have an eeprom setting for this later.
 	i_timeoutLimit = 15; //20 second default, will probably be an eeprom config later
 	b_enableNIST = true;
+	b_enableAP = false;
 	i_NISTupdateFreq = 5; //default to 5 minutes for now.
 	i_NISTUpdateUnit = TIME_MINUTE; //default for now
 	s_NISTServer = "time.nist.gov"; //Default for now.
+	s_uniqueID = "DEFID"; //Default for now
+	i_NISTPort = 13; //default
+	//
+	
+	CreateAdminFields(); //Do this last - creates the data fields/tables for the ADMIN page.
 }
 
 void ESPComm::Process()
@@ -79,9 +89,9 @@ bool ESPComm::setupAccessPoint( const String &ssid, const String &password )
 	WiFi.softAPConfig(Ip, Ip, NMask);
 	if ( WiFi.softAP(ssid.c_str(), password.c_str() ) ) //Set up the access point with our password and SSID name.
 	{
-		sendMessage( "Opening access point with SSID: "+ ssid + " using password: " + password );
+		sendMessage( PSTR("Opening access point with SSID: ")+ ssid + " using password: " + password );
 		IPAddress myIP = WiFi.softAPIP();
-		sendMessage("IP address: " + myIP.toString(), PRIORITY_HIGH );
+		sendMessage( PSTR("IP address: ") + myIP.toString(), PRIORITY_HIGH );
 		p_server->begin();//Start up page server.
 		return true;
 	}
@@ -94,12 +104,12 @@ void ESPComm::closeConnection( bool msg )
 	{
 		if ( !WiFi.isConnected() )
 		{
-			sendMessage("Wifi is not currently connected.");
+			sendMessage( F("Wifi is not currently connected.") );
 			return; //end here
 		}
 		else
 		{
-			sendMessage( "Closing connection to " + WiFi.SSID() );
+			sendMessage( PSTR("Closing connection to ") + WiFi.SSID() );
 		}
 	}
 	WiFi.setAutoReconnect( false ); 
@@ -135,10 +145,10 @@ void ESPComm::scanNetworks()
 	delay(100);
 	int n = WiFi.scanNetworks(); //More than 255 networks in an area? Possible I suppose.
 	if (!n)
-		sendMessage("No networks found");
+		sendMessage( F("No networks found" ));
 	else
 	{
-		sendMessage( String(n) + " networks found.");
+		sendMessage( String(n) + F(" networks found.") );
 		for (int i = 0; i < n; ++i)
 		{
 			// Print SSID and RSSI for each network found
@@ -157,18 +167,17 @@ void ESPComm::beginConnection( const String &ssid, const String &password )
 		return;
 	}
 	
-	sendMessage("Attempting connection to: " + ssid );
+	sendMessage( PSTR("Attempting connection to: ") + ssid );
 	WiFi.mode(WIFI_AP_STA);
 	
 	if ( WiFi.begin( ssid.c_str(), password.c_str() ) == WL_CONNECT_FAILED )
 	{
-		sendMessage("Failed to begin Wifi connection (Invalid password or SSID?)", true );
+		sendMessage( PSTR("Failed to begin Wifi connection (Invalid password or SSID?)") , true );
 		closeConnection();//Just in case
 	}
 	else 
 	{
 		uint8_t i_retries = 0;
-		unsigned long i_delayMS = ( millis() + 1000); //Current time + 1 second 
 		while ( WiFi.status() != WL_CONNECTED && i_retries < i_timeoutLimit ) //We'll give it 10 seconds to try to connect?
 		{
 			/*station_status_t status = wifi_station_get_connect_status();
@@ -207,31 +216,31 @@ void ESPComm::printDiag()
 	switch( WiFi.status() )
 	{
 		case WL_CONNECTED:
-			stat = "Connected";
+			stat = F("Connected");
 			break;
 		case WL_DISCONNECTED:
-			stat = "Disconnected";
+			stat = F("Disconnected");
 			break;
 		case WL_CONNECTION_LOST:
-			stat = "Connection lost";
+			stat = F("Connection lost");
 			break;
 		case WL_IDLE_STATUS:
-			stat = "Idle";
+			stat = F("Idle");
 			break;
 		default:
 			stat = String( WiFi.status() );
 	}
-	sendMessage( "Network Status: " + stat, PRIORITY_HIGH );
-	sendMessage( "IP: " + WiFi.localIP().toString(), PRIORITY_HIGH );
-	sendMessage( "Gateway: " + WiFi.gatewayIP().toString(), PRIORITY_HIGH );
-	sendMessage( "Subnet: " + WiFi.subnetMask().toString(), PRIORITY_HIGH );
-	sendMessage( "MAC: " + WiFi.macAddress(), PRIORITY_HIGH );
+	sendMessage( PSTR("Network Status: ") + stat, PRIORITY_HIGH );
+	sendMessage( PSTR("IP: ") + WiFi.localIP().toString(), PRIORITY_HIGH );
+	sendMessage( PSTR("Gateway: ") + WiFi.gatewayIP().toString(), PRIORITY_HIGH );
+	sendMessage( PSTR("Subnet: ") + WiFi.subnetMask().toString(), PRIORITY_HIGH );
+	sendMessage( PSTR("MAC: ") + WiFi.macAddress(), PRIORITY_HIGH );
 	
-	sendMessage( "Time Server Address: " + s_NISTServer, PRIORITY_HIGH );
-	sendMessage( "Time Update Interval (mins): " + String(i_NISTupdateFreq) );
-	sendMessage( "NIST Time Mode: " + String(b_enableNIST) );
+	sendMessage( PSTR("Time Server Address: ") + s_NISTServer, PRIORITY_HIGH );
+	sendMessage( PSTR("Time Update Interval (mins): ") + String(i_NISTupdateFreq) );
+	sendMessage( PSTR("NIST Time Mode: ") + String(b_enableNIST) );
 	
-	sendMessage( "Available system memory: " + String(system_get_free_heap_size()) + " bytes.", PRIORITY_HIGH );
+	sendMessage( PSTR("Available system memory: ") + String(system_get_free_heap_size()) + " bytes.", PRIORITY_HIGH );
 }
 
 void ESPComm::updateClock()
@@ -262,10 +271,9 @@ bool ESPComm::UpdateNIST( bool force ) //TODO -- NTP?
 			return false;
 		
 		WiFiClient NISTclient;
-		const uint8_t httpPort = 13;
 		
 		uint8_t retries = 0;
-		while( !NISTclient.connect(s_NISTServer, httpPort) )
+		while( !NISTclient.connect(s_NISTServer, i_NISTPort) )
 		{
 			if ( retries >= 5 )
 			{
@@ -276,7 +284,7 @@ bool ESPComm::UpdateNIST( bool force ) //TODO -- NTP?
 			retries++;
 			delay(100); //small delay to allow the server to respond
 		}
-		sendMessage("Updating time.");
+		sendMessage( F("Updating time." ) );
 		
 		delay(100); //small delay to allow the server to respond
 			
