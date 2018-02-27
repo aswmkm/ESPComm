@@ -64,14 +64,13 @@ public:
 	
 	void CreateAdminFields(); //Create static data fields for page.
 	
-	void ProcessDeviceSettings(); //Located in page_admin.cpp, shared with page_config
+	void ProcessDeviceSettings( String & ); //Located in page_admin.cpp, shared with page_config, Appends setting change notifications (if applicable) 
 	//
 	
 	bool CheckUpdateNIST(); //Used to determine if a NIST server check should be performed.
 	bool UpdateNIST( bool = false ); //Used to perform the NIST update.
 
 private:
-	
 	vector <DataField *> p_dataFields; //These are the data fields to be displayed on the index.
 	vector <DataTable *> p_configDataTables; //Organizatioal datafield tables for the config/admin pages
 	

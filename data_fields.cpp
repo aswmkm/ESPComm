@@ -18,12 +18,13 @@ void DataField::SetFieldName( const String &input )
 	s_fieldName = input;	
 }
 
-void DataField::SetFieldValue( const String &input )
+bool DataField::SetFieldValue( const String &input )
 {
 	if ( input.length() > MAX_DATA_LENGTH )
-		return; //Die here, name too long.
+		return false; //Die here, name too long.
 	
 	s_fieldValue = input;
+	return true;
 }
 
 void DataField::SetFieldLabel( const String &input )
@@ -159,4 +160,51 @@ String DataTable::GenerateTableHTML()
 	HTML += F("</P>");
 	HTML += F("</table>");
 	return HTML;
+}
+
+//////////////////////////////////////////////////////////////////////////
+// - SPECIAL FIELD STUFF BELOW
+//////////////////////////////////////////////////////////////////////////
+
+bool STRING_Datafield::SetFieldValue( const String &value )
+{
+	if ( *GetVar() != value && DataField::SetFieldValue( value ) ) //Check the main variable being modified first.
+	{
+		*GetVar() = value;
+		return true;
+	}
+	return false;
+}
+
+bool UINT_Datafield::SetFieldValue( const String &value )
+{
+	unsigned int newValue = parseInt( value );
+	if ( *GetVar() != newValue && DataField::SetFieldValue( value ) )
+	{
+		*GetVar() = newValue;
+		return true;
+	}
+	return false;
+}
+
+bool UINT8_Datafield::SetFieldValue( const String &value )
+{
+	uint8_t newValue = parseInt( value );
+	if ( *GetVar() != newValue && DataField::SetFieldValue( value ) )
+	{
+		*GetVar() = newValue;
+		return true;
+	}
+	return false;
+}
+
+bool BOOL_Datafield::SetFieldValue( const String &value )
+{
+	bool newValue = ( value.length() ? true : false );
+	if ( *GetVar() != newValue && DataField::SetFieldValue( value ) )
+	{
+		*GetVar() = newValue;
+		return true;
+	}
+	return false;
 }

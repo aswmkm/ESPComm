@@ -15,7 +15,7 @@ void ESPComm::HandleConfig()
 	HTML += PSTR("<title>Device: ") + s_uniqueID + PSTR(" User Config Page</title>"); //Page title
 	
 	if ( p_server->args() ) //Do we have some args to input? Apply settings if so.
-		ProcessDeviceSettings();
+		ProcessDeviceSettings( HTML );
 	
 	HTML += F("<FORM action=\"./config\" method=\"post\">");
 	

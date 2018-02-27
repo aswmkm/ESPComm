@@ -26,10 +26,6 @@
 
 #define TYPE_OUTPUT_TEXT 10
 
-#define METHOD_NONE 0
-#define METHOD_POST 1
-#define METHOD_GET 2
-
 const char HTML_HEADER[] PROGMEM =
 "<!DOCTYPE HTML>"
 "<html>"
@@ -65,7 +61,7 @@ class DataField
 	int GetAddress() { return i_Address; } //returns the address of the field (Used to make sure we're updating the proper field)
 	uint8_t GetType() { return i_Type; } //Returns the field type (used for the generation of the HTML code)
 	void SetFieldName( const String & ); //This sets the name for the field.
-	void SetFieldValue( const String & ); //This is used for setting the data within the field.
+	virtual bool SetFieldValue( const String & ); //This is used for setting the data within the field.
 	void SetFieldLabel( const String & ); //Used to set text label for field (if applicable)
 	void SetVisible( bool vis ){ b_visible = vis; }
 	void SetEnabled( bool en ){ b_enabled = en; }
@@ -109,7 +105,72 @@ class DataTable //This class is basically used to create sections for specific t
 	private: 
 	String s_tableName;
 	String s_tableID;
-	vector<DataField *> p_fields; //vector containing the pointers to all of our data fields.
+	vector<DataField *> p_fields; //vector containing the pointers to all of our data fields (regular fields only).
+};
+
+//SPECIAL DATAFIELDS - For directly modifying settings.
+class UINT_Datafield : public DataField
+{
+	public:
+	UINT_Datafield( unsigned int *var, int address, uint8_t type, const String &fieldLabel = "", const String &fieldName = "", const String &defaultValue = "", bool newLine = true) :
+	DataField( address, type, fieldLabel, fieldName, defaultValue, newLine )
+	{
+		fieldVar = var;
+	}
+	
+	unsigned int *GetVar(){ return fieldVar; }
+	bool SetFieldValue( const String & );
+	
+	private:
+	unsigned int *fieldVar;
+};
+
+class UINT8_Datafield : public DataField
+{
+	public:
+	UINT8_Datafield( uint8_t *var, int address, uint8_t type, const String &fieldLabel = "", const String &fieldName = "", const String &defaultValue = "", bool newLine = true) :
+	DataField( address, type, fieldLabel, fieldName, defaultValue, newLine )
+	{
+		fieldVar = var;
+	}
+	
+	uint8_t *GetVar(){ return fieldVar; }
+	bool SetFieldValue( const String & );
+	
+	private:
+	uint8_t *fieldVar;
+};
+
+class BOOL_Datafield : public DataField
+{
+	public:
+	BOOL_Datafield( bool *var, int address, uint8_t type, const String &fieldLabel = "", const String &fieldName = "", const String &defaultValue = "", bool newLine = true) :
+	DataField( address, type, fieldLabel, fieldName, defaultValue, newLine )
+	{
+		fieldVar = var;
+	}
+	
+	bool *GetVar(){ return fieldVar; }
+	bool SetFieldValue( const String & );
+		
+	private:
+	bool *fieldVar;
+};
+
+class STRING_Datafield : public DataField
+{
+	public:
+	STRING_Datafield( String *var, int address, uint8_t type, const String &fieldLabel = "", const String &fieldName = "", const String &defaultValue = "", bool newLine = true ) :
+	DataField( address, type, fieldLabel, fieldName, defaultValue, newLine )
+	{
+		fieldVar = var;
+	}
+	
+	String *GetVar(){ return fieldVar; }
+	bool SetFieldValue( const String & );
+		
+	private:
+	String *fieldVar;
 };
 
 #endif /* DATA_FIELDS_H_ */
