@@ -20,8 +20,8 @@ void ESPComm::CreateAdminFields() //Should never be called more than once
 	//DataField *resourceField = new DataField( 2, TYPE_INPUT_CHECKBOX, "Verbose Mode (Serial)", "verbose_serial", "checked" );
 	
 	//Device specific setings
-	deviceTable->AddElement( new STRING_Datafield( &s_uniqueID, 1, TYPE_INPUT_TEXT, F("Device Unique ID"), F("devid"), s_uniqueID ) ); 
-	deviceTable->AddElement( new BOOL_Datafield( &b_enableAP, 2, TYPE_INPUT_CHECKBOX, F("Enable Access Point Mode"), F("devap"), (b_enableAP ? "on" : "") ) );
+	deviceTable->AddElement( new STRING_Datafield( &s_uniqueID, 1, TYPE_INPUT_TEXT, F("Device Unique ID"), F("devid") ) ); 
+	deviceTable->AddElement( new BOOL_Datafield( &b_enableAP, 2, TYPE_INPUT_CHECKBOX, F("Enable Access Point Mode"), F("devap") ) );
 	deviceTable->AddElement( new DataField(3, TYPE_INPUT_TEXT, F("Access Point SSID"), F("devapssid") ) );
 	deviceTable->AddElement( new DataField(4, TYPE_INPUT_PASSWORD, F("Access Point Password"), F("devappwd") ) );
 	//
@@ -29,7 +29,7 @@ void ESPComm::CreateAdminFields() //Should never be called more than once
 	//Network Table Stuff
 	networkTable->AddElement( new DataField(5, TYPE_INPUT_TEXT, F("Wifi Network SSID"), F("netssid") ) );
 	networkTable->AddElement( new DataField(6, TYPE_INPUT_PASSWORD, F("Wifi Password"), F("netpwd") ) );
-	networkTable->AddElement( new UINT8_Datafield( &i_timeoutLimit, 7, TYPE_INPUT_TEXT, F("Wifi Connection Retry Limit"), F("netretrylimit"), String(i_timeoutLimit) ) );
+	networkTable->AddElement( new UINT8_Datafield( &i_timeoutLimit, 7, TYPE_INPUT_TEXT, F("Wifi Connection Retry Limit"), F("netretrylimit") ) );
 	networkTable->AddElement( new DataField(8, TYPE_INPUT_CHECKBOX, F("Auto Retry On Disconnect"), F("netautoretry") ) );
 	//
 	
@@ -43,14 +43,14 @@ void ESPComm::CreateAdminFields() //Should never be called more than once
 	//
 	
 	//Time table stuff
-	timeTable->AddElement( new BOOL_Datafield( &b_enableNIST, 15, TYPE_INPUT_CHECKBOX, F("Enable NIST Time Updating"), F("nistupd"), (b_enableNIST ? "on" : "") ) );
-	timeTable->AddElement( new STRING_Datafield( &s_NISTServer, 16, TYPE_INPUT_TEXT, F("NIST Time Update Server"), F("nistserv"), s_NISTServer ) );
-	timeTable->AddElement( new UINT_Datafield( &i_NISTPort, 17, TYPE_INPUT_TEXT, F("Time Server Port"), F("nistport"), String(i_NISTPort) ) );
-	timeTable->AddElement( new UINT_Datafield( &i_NISTupdateFreq, 18, TYPE_INPUT_TEXT, F("NIST Time Update Frequency"), "nistfreq", String(i_NISTupdateFreq) ) );
+	timeTable->AddElement( new BOOL_Datafield( &b_enableNIST, 15, TYPE_INPUT_CHECKBOX, F("Enable NIST Time Updating"), F("nistupd") ) );
+	timeTable->AddElement( new STRING_Datafield( &s_NISTServer, 16, TYPE_INPUT_TEXT, F("NIST Time Update Server"), F("nistserv") ) );
+	timeTable->AddElement( new UINT_Datafield( &i_NISTPort, 17, TYPE_INPUT_TEXT, F("Time Server Port"), F("nistport") ) );
+	timeTable->AddElement( new UINT_Datafield( &i_NISTupdateFreq, 18, TYPE_INPUT_TEXT, F("NIST Time Update Frequency"), "nistfreq" ) );
 	//
 	
 	//Verbose table stuff
-	verboseTable->AddElement( new UINT8_Datafield( &i_verboseMode, 19, TYPE_INPUT_TEXT, F("Verbose Mode (Serial)"), F("verbmode"), String(i_verboseMode) ) );
+	verboseTable->AddElement( new UINT8_Datafield( &i_verboseMode, 19, TYPE_INPUT_TEXT, F("Verbose Mode (Serial)"), F("verbmode") ) );
 	//	
 	
 	//Save Table Stuff

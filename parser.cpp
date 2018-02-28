@@ -6,9 +6,7 @@
  * TODO: Reduce usage of String objects in favor of C-Style char arrays (memory safety).
  */ 
 
-#include "common.h"
 #include "arduino.h" //Used for serial.
-#include <vector>
 #include "ESPComm.h"
 
 void ESPComm::parseSerialData()

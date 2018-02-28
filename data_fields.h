@@ -6,10 +6,6 @@
  * This header file contains the definitions for all functions related to the 
  */ 
 
-#include "common.h"
-#include <vector>
-#include <WString.h>
-
 #ifndef DATA_FIELDS_H_
 #define DATA_FIELDS_H_
 
@@ -45,7 +41,7 @@ const char HTML_FOOTER[] PROGMEM =
 class DataField
 {
 	public:
-	DataField( int address, uint8_t type, const String &fieldLabel = "", const String &fieldName = "", const String &defaultValue = "", bool newLine = true )
+	DataField( unsigned int address, uint8_t type, const String &fieldLabel = "", const String &fieldName = "", const String &defaultValue = "", bool newLine = true )
 	{
 		i_Address = address;
 		i_Type = type;
@@ -58,7 +54,7 @@ class DataField
 	}
 	bool IsEnabled(){ return b_enabled; }
 	bool IsVisible(){ return b_visible; }
-	int GetAddress() { return i_Address; } //returns the address of the field (Used to make sure we're updating the proper field)
+	unsigned int GetAddress() { return i_Address; } //returns the address of the field (Used to make sure we're updating the proper field)
 	uint8_t GetType() { return i_Type; } //Returns the field type (used for the generation of the HTML code)
 	void SetFieldName( const String & ); //This sets the name for the field.
 	virtual bool SetFieldValue( const String & ); //This is used for setting the data within the field.
@@ -66,7 +62,7 @@ class DataField
 	void SetVisible( bool vis ){ b_visible = vis; }
 	void SetEnabled( bool en ){ b_enabled = en; }
 	const String &GetFieldName() { return s_fieldName; }
-	const String &GetFieldValue() { return s_fieldValue; }
+	virtual const String GetFieldValue() { return s_fieldValue; }
 	const String &GetFieldLabel() { return s_fieldLabel; }
 	String GenerateHTML(); //Used to create the HTML to be appended to the body of the web page.
 	
@@ -74,7 +70,7 @@ class DataField
 	uint8_t i_Type; //This represents the type of data field we're displaying (Text-box, radio button, etc)
 	uint8_t i_Method,
 			i_Function;
-	int i_Address; //Represents the address number used for updating values in the field.	
+	unsigned int i_Address; //Represents the address number used for updating values in the field.	
 	String s_fieldName; //Used for POST/GET methods.
 	String s_fieldValue; //This is the data being displayed within the form (default text in a text-box for example)
 	String s_fieldLabel; //Text that describes the field
@@ -112,14 +108,16 @@ class DataTable //This class is basically used to create sections for specific t
 class UINT_Datafield : public DataField
 {
 	public:
-	UINT_Datafield( unsigned int *var, int address, uint8_t type, const String &fieldLabel = "", const String &fieldName = "", const String &defaultValue = "", bool newLine = true) :
-	DataField( address, type, fieldLabel, fieldName, defaultValue, newLine )
+	UINT_Datafield( unsigned int *var, unsigned int address, uint8_t type, const String &fieldLabel = "", const String &fieldName = "", bool newLine = true) :
+	DataField( address, type, fieldLabel, fieldName, "", newLine )
 	{
 		fieldVar = var;
 	}
 	
 	unsigned int *GetVar(){ return fieldVar; }
+	bool SetFieldValue( const unsigned int & );
 	bool SetFieldValue( const String & );
+	const String GetFieldValue();
 	
 	private:
 	unsigned int *fieldVar;
@@ -128,14 +126,16 @@ class UINT_Datafield : public DataField
 class UINT8_Datafield : public DataField
 {
 	public:
-	UINT8_Datafield( uint8_t *var, int address, uint8_t type, const String &fieldLabel = "", const String &fieldName = "", const String &defaultValue = "", bool newLine = true) :
-	DataField( address, type, fieldLabel, fieldName, defaultValue, newLine )
+	UINT8_Datafield( uint8_t *var, unsigned int address, uint8_t type, const String &fieldLabel = "", const String &fieldName = "", bool newLine = true) :
+	DataField( address, type, fieldLabel, fieldName, "", newLine )
 	{
 		fieldVar = var;
 	}
 	
 	uint8_t *GetVar(){ return fieldVar; }
+	bool SetFieldValue( const uint8_t & );
 	bool SetFieldValue( const String & );
+	const String GetFieldValue();
 	
 	private:
 	uint8_t *fieldVar;
@@ -144,14 +144,16 @@ class UINT8_Datafield : public DataField
 class BOOL_Datafield : public DataField
 {
 	public:
-	BOOL_Datafield( bool *var, int address, uint8_t type, const String &fieldLabel = "", const String &fieldName = "", const String &defaultValue = "", bool newLine = true) :
-	DataField( address, type, fieldLabel, fieldName, defaultValue, newLine )
+	BOOL_Datafield( bool *var, unsigned int address, uint8_t type, const String &fieldLabel = "", const String &fieldName = "", bool newLine = true) :
+	DataField( address, type, fieldLabel, fieldName, "", newLine )
 	{
 		fieldVar = var;
 	}
 	
 	bool *GetVar(){ return fieldVar; }
+	bool SetFieldValue( const bool & );
 	bool SetFieldValue( const String & );
+	const String GetFieldValue();
 		
 	private:
 	bool *fieldVar;
@@ -160,17 +162,89 @@ class BOOL_Datafield : public DataField
 class STRING_Datafield : public DataField
 {
 	public:
-	STRING_Datafield( String *var, int address, uint8_t type, const String &fieldLabel = "", const String &fieldName = "", const String &defaultValue = "", bool newLine = true ) :
-	DataField( address, type, fieldLabel, fieldName, defaultValue, newLine )
+	STRING_Datafield( String *var, unsigned int address, uint8_t type, const String &fieldLabel = "", const String &fieldName = "", bool newLine = true ) :
+	DataField( address, type, fieldLabel, fieldName, "", newLine )
 	{
 		fieldVar = var;
 	}
 	
 	String *GetVar(){ return fieldVar; }
 	bool SetFieldValue( const String & );
+	const String GetFieldValue();
 		
 	private:
 	String *fieldVar;
 };
+
+
+//Reactive Settings (They execute a function upon value being changed)
+class STRING_S_Datafield : public DataField
+{
+	public:
+	STRING_S_Datafield( ReactiveSetting_STRING *var, unsigned int address, uint8_t type, const String &fieldLabel = "", const String &fieldName = "", bool newLine = true ) :
+	DataField( address, type, fieldLabel, fieldName, "", newLine )
+	{
+		setting = var;
+	}
+	
+	ReactiveSetting_STRING *GetSetting(){ return setting; }
+	bool SetFieldValue( const String & );
+	const String GetFieldValue(){ return setting->ToString(); }
+	
+	private:
+	ReactiveSetting_STRING *setting;
+};
+
+class UINT_S_Datafield : public DataField
+{
+	public:
+	UINT_S_Datafield( ReactiveSetting_UINT *var, unsigned int address, uint8_t type, const String &fieldLabel = "", const String &fieldName = "", bool newLine = true ) :
+	DataField( address, type, fieldLabel, fieldName, "", newLine )
+	{
+		setting = var;
+	}
+	
+	ReactiveSetting_UINT *GetSetting(){ return setting; }
+	bool SetFieldValue( const String & );
+	const String GetFieldValue(){ return setting->ToString(); }
+	
+	private:
+	ReactiveSetting_UINT *setting;
+};
+
+class UINT8_S_Datafield : public DataField
+{
+	public:
+	UINT8_S_Datafield( ReactiveSetting_UINT8 *var, unsigned int address, uint8_t type, const String &fieldLabel = "", const String &fieldName = "", bool newLine = true ) :
+	DataField( address, type, fieldLabel, fieldName, "", newLine )
+	{
+		setting = var;
+	}
+	
+	ReactiveSetting_UINT8 *GetSetting(){ return setting; }
+	bool SetFieldValue( const String & );
+	const String GetFieldValue(){ return setting->ToString(); }
+	
+	private:
+	ReactiveSetting_UINT8 *setting;
+};
+
+class BOOL_S_Datafield : public DataField
+{
+	public:
+	BOOL_S_Datafield( ReactiveSetting_BOOL *var, unsigned int address, uint8_t type, const String &fieldLabel = "", const String &fieldName = "", bool newLine = true ) :
+	DataField( address, type, fieldLabel, fieldName, "", newLine )
+	{
+		setting = var;
+	}
+	
+	ReactiveSetting_BOOL *GetSetting(){ return setting; }
+	bool SetFieldValue( const String & );
+	const String GetFieldValue(){ return setting->ToString(); }
+	
+	private:
+	ReactiveSetting_BOOL *setting;
+};
+
 
 #endif /* DATA_FIELDS_H_ */

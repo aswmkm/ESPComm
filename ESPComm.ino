@@ -4,12 +4,8 @@ IoT project - Communication between two ESP8266 - Talk with Each Other
 ESP8266 Arduino code example
 */
 
-#include "common.h"
-#include "data_fields.h"
-#include <vector>
 #include "ESPComm.h"
 #include "user_interface.h"
-#include "time.h"
 
 WiFiClient client;
 MySQL_Connection SQL_Connection((Client *)&client);
@@ -34,12 +30,15 @@ void loop()
 
 void ESPComm::setup()
 {
+	p_UDP = new WiFiUDP();
+	p_UDP->begin(123); //Open port 123 for NTP packet
 	//Init our objects/configs here.
 	setupServer(); //Set up the web hosting directories.
 	//Time object initialization
 	p_currentTime = new Time;
 	p_nextNISTUpdateTime = new Time;
 	//
+	
 	
 	//Default stuff for now, until EEPROM loading is implemented
 	i_verboseMode = PRIORITY_LOW; //Do this by default for now, will probably have an eeprom setting for this later.
@@ -51,6 +50,7 @@ void ESPComm::setup()
 	s_NISTServer = "time.nist.gov"; //Default for now.
 	s_uniqueID = "DEFID"; //Default for now
 	i_NISTPort = 13; //default
+	i_nistMode = 1; //NTP
 	//
 	
 	CreateAdminFields(); //Do this last - creates the data fields/tables for the ADMIN page.
@@ -89,9 +89,9 @@ bool ESPComm::setupAccessPoint( const String &ssid, const String &password )
 	WiFi.softAPConfig(Ip, Ip, NMask);
 	if ( WiFi.softAP(ssid.c_str(), password.c_str() ) ) //Set up the access point with our password and SSID name.
 	{
-		sendMessage( PSTR("Opening access point with SSID: ")+ ssid + " using password: " + password );
+		sendMessage( "Opening access point with SSID: " + ssid + " using password: " + password );
 		IPAddress myIP = WiFi.softAPIP();
-		sendMessage( PSTR("IP address: ") + myIP.toString(), PRIORITY_HIGH );
+		sendMessage( "IP address: " + myIP.toString(), PRIORITY_HIGH );
 		p_server->begin();//Start up page server.
 		return true;
 	}
@@ -257,11 +257,13 @@ void ESPComm::updateClock()
 		return;
 		
 	//System clock increase below.
-	p_currentTime->IncrementTime( 1, TIME_SECOND );//1 second at a time.
+	p_currentTime->IncrementTime( 1, TIME_SECOND );// increment 1 second at a time.
 }
 
 bool ESPComm::UpdateNIST( bool force ) //TODO -- NTP?
 {
+	uint8_t retries = 0;
+	
 	if ( WiFi.status() == WL_CONNECTED && b_enableNIST && s_NISTServer.length() ) //Must be on a network before attempting to connect to NIST server
 	{
 		if ( !i_NISTupdateFreq && !force ) //must be a non-zero value
@@ -270,39 +272,69 @@ bool ESPComm::UpdateNIST( bool force ) //TODO -- NTP?
 		if ( p_currentTime->IsBehind( p_nextNISTUpdateTime ) && !force ) //too soon for an update?
 			return false;
 		
-		WiFiClient NISTclient;
-		
-		uint8_t retries = 0;
-		while( !NISTclient.connect(s_NISTServer, i_NISTPort) )
-		{
-			if ( retries >= 5 )
-			{
-				sendMessage("Connection to NIST server: '" + s_NISTServer + "' failed.", PRIORITY_HIGH );
-				b_enableNIST = false;
-				return false;
-			}
-			retries++;
-			delay(100); //small delay to allow the server to respond
-		}
 		sendMessage( F("Updating time." ) );
 		
-		delay(100); //small delay to allow the server to respond
-			
-		while( NISTclient.available() )
+		if ( !i_nistMode )
 		{
-			String line = NISTclient.readStringUntil('\r'); //DAYTIME protocol - meh, it works.
-			if ( line.length() < 24 )
-				return false; //to be safe
+			WiFiClient NISTclient;
+		
+			while( !NISTclient.connect(s_NISTServer, i_NISTPort) )
+			{
+				if ( retries >= 5 )
+				{
+					sendMessage("Connection to NIST server: '" + s_NISTServer + "' failed.", PRIORITY_HIGH );
+					return false;
+				}
+				retries++;
+				delay(100); //small delay to allow the server to respond
+			}
+		
+			delay(100); //small delay to allow the server to respond
+			
+			while( NISTclient.available() )
+			{
+				String line = NISTclient.readStringUntil('\r'); //DAYTIME protocol - meh, it works.
+				if ( line.length() < 24 )
+					return false; //to be safe
 					
-			//Break the string down into its components, then save.
-			if ( !p_currentTime->SetTime( line.substring(7, 9).toInt(), line.substring(10, 12).toInt(), line.substring(13, 15).toInt(),
-			 line.substring(16, 18).toInt(), line.substring(19, 21).toInt(), line.substring(22, 24).toInt() ) )
-				return false;
-				
-			p_nextNISTUpdateTime->SetTime( p_currentTime ); //Replace with current time
+				//Break the string down into its components, then save.
+				if ( !p_currentTime->SetTime( line.substring(7, 9).toInt(), line.substring(10, 12).toInt(), line.substring(13, 15).toInt(),
+				 line.substring(16, 18).toInt(), line.substring(19, 21).toInt(), line.substring(22, 24).toInt() ) )
+					return false;
+			}
+		}
+		else if ( i_nistMode == 1 ) //NTP mode
+		{
+			uint8_t NTP_PACKET_SIZE = 48;
+			byte NTPBuffer[NTP_PACKET_SIZE]; // buffer to hold incoming and outgoing packets
+			memset(NTPBuffer, 0, NTP_PACKET_SIZE);  // set all bytes in the buffer to 0
+			// Initialize values needed to form NTP request
+			NTPBuffer[0] = 0b11100011;   // LI, Version, Mode
+			// send a packet requesting a timestamp:
+			p_UDP->beginPacket(s_NISTServer.c_str(), 123); // NTP requests are to port 123
+			p_UDP->write(NTPBuffer, NTP_PACKET_SIZE); 
+			p_UDP->endPacket();
+			
+			delay(100);
+			while ( !p_UDP->parsePacket()  ) //Have we received anything?
+			{
+				if ( retries >= 5 )
+				{
+					sendMessage("No response from NIST server: " + s_NISTServer, PRIORITY_HIGH );
+					return false;
+				}
+				delay(500); // wait a bit
+				retries++;
+			}
+			
+			p_UDP->read(NTPBuffer, NTP_PACKET_SIZE); // read the packet into the buffer
+			uint32_t NTPTime = (NTPBuffer[40] << 24) | (NTPBuffer[41] << 16) | (NTPBuffer[42] << 8) | NTPBuffer[43]; // Combine the 4 timestamp bytes into one 32-bit number
+			// Convert NTP time to a UNIX timestamp:
+			p_currentTime->SetNTPTime( NTPTime - 2208988800UL );
 		}
 		
-		p_nextNISTUpdateTime->IncrementTime( i_NISTupdateFreq, i_NISTUpdateUnit );
+		p_nextNISTUpdateTime->SetTime( p_currentTime ); //Replace with current time
+		p_nextNISTUpdateTime->IncrementTime( i_NISTupdateFreq, i_NISTUpdateUnit );//Then increment -- need to rework this a bit
 		
 		return true; //End here, we'll let the system clock carry on on the next second.
 	}

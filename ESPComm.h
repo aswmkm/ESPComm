@@ -6,9 +6,8 @@
  * This header contains the base functions for the project.
  */ 
 
-#include "common.h"
-#include "data_fields.h" 
-#include "time.h"
+#include <vector>
+#include <WString.h>
 #include <ESP8266WiFi.h>
 #include <ESP8266WebServer.h>
 #include <DNSServer.h>
@@ -16,9 +15,12 @@
 #include <MySQL_Connection.h>
 #include <MySQL_Cursor.h>
 //
+#include <WiFiUdp.h> //for NTP protocol
 
-
-#define REFRESH_RATE 3 //Make this static for now, might do a config section for this.
+#include "common.h"
+#include "settings.h"
+#include "data_fields.h" //depends on settings.h --must come afterwards
+#include "time.h"
 
 
 #ifndef ESPCOMM_H_
@@ -59,7 +61,7 @@ public:
 	//These functions handle the generation of HTML pages t be transmitted to users
 	void HandleIndex(); //Index that displays the data fields.
 	void HandleConfig(); //Device config (possibly user specific configs loaded from SQL (if available ?) ) 
-	void HandleLogin(); //User (student) login page.
+	void HandleLogin(); //User (student/admin) login page.
 	void HandleAdmin(); //Administration page (instructor page)
 	
 	void CreateAdminFields(); //Create static data fields for page.
@@ -72,12 +74,10 @@ public:
 
 private:
 	vector <DataField *> p_dataFields; //These are the data fields to be displayed on the index.
-	vector <DataTable *> p_configDataTables; //Organizatioal datafield tables for the config/admin pages
+	vector <DataTable *> p_configDataTables; //Organizational datafield tables for the config/admin pages
 	
-	DataField *p_EEPROMSubmit; //Checkbox that enables/disables the saving of configs to the system EEPROM
-	DataField *p_configSubmit; //Submit button for configs 
-	
-	ESP8266WebServer *p_server;
+	ESP8266WebServer *p_server; //web server object
+	WiFiUDP *p_UDP; //UDP rotocol object.
 	
 	uint8_t i_timeoutLimit;
 	uint8_t i_verboseMode; //Used to determine what messages should be sent over the serial channel
@@ -89,7 +89,7 @@ private:
 	//System Clock objects
 	Time *p_currentTime;
 	Time *p_nextNISTUpdateTime; //Used to store the time for next NIST update.
-	
+	uint8_t i_nistMode; //Daylight vs NTP protocol
 	String s_NISTServer;
 	unsigned int i_NISTPort;
 	uint8_t i_lastUpdateSecond;
@@ -98,10 +98,12 @@ private:
 	//NIST time variables
 	unsigned int i_NISTupdateFreq; //frequency of NIST time update
 	uint8 i_NISTUpdateUnit; //Unit of time for frequency between updates.
+	bool b_enableNIST; //Enable time server update mode?
 	//
 	
-	bool b_enableNIST; //Enable time server update mode?
+	//Reactive settings pointers. (These execute a specific function when their value has changed)
 	bool b_enableAP; //Enable access point mode?
+	//
 };
 
 long parseInt( const String &str );

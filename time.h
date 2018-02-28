@@ -40,13 +40,14 @@ class Time
 	bool SetTime( const uint8_t &yr, const uint8_t &mo, const uint8_t &day, const uint8_t &hr, const uint8_t &min, const uint8_t &sec );
 	bool SetTime( const Time &T2 ); //For copying values over
 	bool SetTime( const Time *T2 ); //For copying values over
+	void SetNTPTime( unsigned long ); //For translating NTP to a valid date/time
+	bool IncrementTime( uint32_t, uint8_t ); //Input increment amount, along with time unit, can also be used to set.
 	bool IsAhead( const Time * );
 	bool IsBehind( const Time *T2 ){ return !IsAhead(T2); }
 	uint8_t GetMonthDays( uint8_t ); //Used to determine the proper number of days in a specific month.
 	bool SetTimeZone( const uint8_t &zone ){ i_timeZone = zone; }
 	uint8_t GetTimeZone(){ return i_timeZone; }
-	bool IncrementTime( unsigned int, uint8_t ); //Input increment amount, along with time unit.
-	String GetTimeStr(); //Returns a formatted string, representing the current saved time.
+	String GetTimeStr( bool decade = true ); //Returns a formatted string, representing the current saved time.
 	
 	//Operator stuff.
 	bool operator< ( const Time &T2 ); //see time.cpp

@@ -5,8 +5,7 @@
  *  Author: Andrew
  */ 
 
-#include "data_fields.h"
-#include "common.h"
+
 #include "ESPComm.h"
 
 
@@ -66,7 +65,7 @@ String DataField::GenerateHTML()
 	switch ( GetType() )
 	{
 		case TYPE_INPUT_CHECKBOX:
-			if ( strlen( GetFieldValue().c_str() ) ) //Only set this if we have some value there, otherwise it'll just count as "enabled" - weird.
+			if ( strlen( GetFieldValue().c_str() ) && GetFieldValue() != String(false) ) //Only set this if we have some value there, otherwise it'll just count as "enabled" - weird.
 				HTML += "checked=\"" + GetFieldValue() + "\" ";
 			break;
 		default:
@@ -163,12 +162,14 @@ String DataTable::GenerateTableHTML()
 }
 
 //////////////////////////////////////////////////////////////////////////
-// - SPECIAL FIELD STUFF BELOW
+// - SPECIAL FIELD STUFF BELOW - The idea here is that we're modifying the variables that are tied to the objects, 
+// - rather than the local variables that are stored in the DataField class. This will allow us to view changes to these variables 
+// - made by other methods (serial parser for example) in the HTML, without the need for matching the var and the FieldValue string. 
 //////////////////////////////////////////////////////////////////////////
 
 bool STRING_Datafield::SetFieldValue( const String &value )
 {
-	if ( *GetVar() != value && DataField::SetFieldValue( value ) ) //Check the main variable being modified first.
+	if ( *GetVar() != value  ) //Check the main variable being modified first.
 	{
 		*GetVar() = value;
 		return true;
@@ -179,9 +180,19 @@ bool STRING_Datafield::SetFieldValue( const String &value )
 bool UINT_Datafield::SetFieldValue( const String &value )
 {
 	unsigned int newValue = parseInt( value );
-	if ( *GetVar() != newValue && DataField::SetFieldValue( value ) )
+	if ( *GetVar() != newValue  )
 	{
 		*GetVar() = newValue;
+		return true;
+	}
+	return false;
+}
+
+bool UINT_Datafield::SetFieldValue( const unsigned int &value )
+{
+	if ( *GetVar() != value  )
+	{
+		*GetVar() = value;
 		return true;
 	}
 	return false;
@@ -190,7 +201,7 @@ bool UINT_Datafield::SetFieldValue( const String &value )
 bool UINT8_Datafield::SetFieldValue( const String &value )
 {
 	uint8_t newValue = parseInt( value );
-	if ( *GetVar() != newValue && DataField::SetFieldValue( value ) )
+	if ( *GetVar() != newValue  )
 	{
 		*GetVar() = newValue;
 		return true;
@@ -198,13 +209,53 @@ bool UINT8_Datafield::SetFieldValue( const String &value )
 	return false;
 }
 
+bool UINT8_Datafield::SetFieldValue( const uint8_t &value )
+{
+	if ( *GetVar() != value  )
+	{
+		*GetVar() = value;
+		return true;
+	}
+	return false;
+}
+
 bool BOOL_Datafield::SetFieldValue( const String &value )
 {
-	bool newValue = ( value.length() ? true : false );
-	if ( *GetVar() != newValue && DataField::SetFieldValue( value ) )
+	bool newValue = ( parseInt( value ) || value.length() );
+	if ( *GetVar() != newValue  )
 	{
 		*GetVar() = newValue;
 		return true;
 	}
 	return false;
+}
+
+bool BOOL_Datafield::SetFieldValue( const bool &value )
+{
+	if ( *GetVar() != value  )
+	{
+		*GetVar() = value;
+		return true;
+	}
+	return false;
+}
+
+const String STRING_Datafield::GetFieldValue()
+{
+	return *GetVar();
+}
+
+const String UINT_Datafield::GetFieldValue()
+{
+	return String( *GetVar() );
+}
+
+const String UINT8_Datafield::GetFieldValue()
+{
+	return String( *GetVar() );
+}
+
+const String BOOL_Datafield::GetFieldValue()
+{
+	return String( *GetVar() );
 }

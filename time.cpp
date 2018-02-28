@@ -6,7 +6,6 @@
  * This file contains the function definitions for the Time class.
  */ 
 
-#include "time.h"
 #include "ESPComm.h"
 #include <limits.h>
 
@@ -33,9 +32,29 @@ bool Time::operator==( const Time &T2 )
 	return ( i_year == T2.i_year && i_month == T2.i_month && i_day == T2.i_day && i_hour == T2.i_hour && i_minute == T2.i_minute && i_second == T2.i_second );
 }
 
-String Time::GetTimeStr()
+String Time::GetTimeStr( bool decade )
 {
-	return ( i_year + String(":") + i_month + String(":") + i_day + String(":") + i_hour + String(":") + i_minute + String(":") + i_second );
+	return ( ( (i_year < 10 && decade) ? String("0") + i_year : i_year ) + String(":") 
+		+ ( ( i_month < 10 && decade ) ? String("0") + i_month: i_month ) + String(":") 
+		+ ( ( i_day < 10 && decade ) ? String("0") + i_day : i_day ) + String(":") 
+		+ ( ( i_hour < 10 && decade ) ? String("0") + i_hour : i_hour ) + String(":") 
+		+ ( ( i_minute < 10 && decade ) ? String("0") + i_minute : i_minute ) + String(":")
+		+ ( ( i_second < 10 && decade ) ? String("0") + i_second : i_second ) );
+}
+
+void Time::SetNTPTime( unsigned long time )
+{
+	//Jan 1 1970 = base time
+	i_year = 0; //reset
+	i_month = 1;
+	i_day = 1;
+	//
+	
+	i_second = time%60; //Set seconds now
+	i_minute = (time/60)%60; //Set the minutes now
+	i_hour = (time/3600)%NUM_HOURS_DAY; //Just total these for now, we can use the existing container for temp storage
+	i_day = AdvanceMonthYear( time/(3600*NUM_HOURS_DAY) );
+	i_year -= 30; //meh
 }
 
 bool Time::IncrementTime( unsigned int inc, uint8_t unit )
@@ -51,6 +70,7 @@ bool Time::IncrementTime( unsigned int inc, uint8_t unit )
 			
 			tempMinutes = (((inc + i_second)/60) + i_minute); //Total minutes + existing minutes
 			i_second = (inc + i_second)%60; //Set seconds now
+		
 			if ( tempMinutes > i_minute ) //Should we proceed beyond this? (saving CPU)
 			{
 				i_minute = tempMinutes%60; //Set the minutes now
@@ -122,6 +142,7 @@ bool Time::IncrementTime( unsigned int inc, uint8_t unit )
 
 uint8 Time::GetMonthDays( uint8_t month )
 {
+	uint16_t totalYear = 1970 + i_year; //leap year stuff
 	switch( month )
 	{
 		case 4:
@@ -130,6 +151,9 @@ uint8 Time::GetMonthDays( uint8_t month )
 		case 11:
 			return 30;
 		case 2:
+			if ( !(totalYear%4) && totalYear%400 ) //for NTP stuff
+				return 29;
+				
 			return 28;
 		default: //all others
 			return 31;
@@ -140,7 +164,7 @@ uint8_t Time::AdvanceMonthYear( unsigned int days )
 {
 	while ( days > GetMonthDays(i_month) )
 	{
-		days -= ( GetMonthDays(i_month) - 1 ); //We can't go to day '0'
+		days -= GetMonthDays(i_month);
 		i_month++; //Just keep adding the months up, we shouldn't be able to roll over here.
 		if ( i_month > NUM_MONTHS_YEAR )
 		{

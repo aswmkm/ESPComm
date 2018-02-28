@@ -10,24 +10,11 @@
   */
 
 #include "ESPComm.h"
-  
-/*
-
-"<h1>ESP8266 Web Form Demo</h1>" //Custom section names later?
-"<FORM action=\"/\" method=\"post\">"
-"<P>"
-"LED<br>"
-"<INPUT type=\"radio\" name=\"LED\" value=\"1\">On<BR>"
-"<INPUT type=\"radio\" name=\"LED\" value=\"0\">Off<BR>"
-"<INPUT type=\"submit\" value=\"Send\"> <INPUT type=\"reset\">"
-"</P>"
-"</FORM>";
-*/
 
 void ESPComm::HandleIndex() //Generate the HTML for our main page.
 {	  
 	String HTML = String(HTML_HEADER);
-	HTML += "<title>Device ID Here:</title>"; //Page title
+	HTML += "<title>Device: " + s_uniqueID +"</title>"; //Page title
 	
 	HTML += "<FORM action=\"/\" method=\"post\">";
 	HTML += "<P>";
