@@ -1,0 +1,26 @@
+Serial Commands:
+/f - Used to manually create new data fields for display in the http server's index page.
+/s - Used to manually scan for existing wireless networks within range of the device. This is needed to manually connect via SSID index.
+/d - Used to disconect or disable any Wifi activity. This also stops the access point mode if in use.
+/i - Used to display current network info and other performance related statistics.
+/p - Used to program specific values into the EEPROM to be loaded automaticaly on bootup.
+/v - Used to enable or disable verbose mode (there will likely be several levels to this setting in the future) 
+/t - Used to modify the device system time.
+/a - Used to set access point mode (hotspot)
+
+Verbose Modes '/v'- Device error/status messages can be set to disabled, high priority only, or fully verbose.
+Settings:
+	- 0/off - Completely disabled.
+	- 1/on - High priority only.
+	- 2 - Print all messages.
+
+System Time Settings '/t'
+	- z(one):<input> - Sets the timezone for the device (Based on UTC, useful for NIST time via network)
+	- t(ime):<year>:<month>:<day>:<hour>:<minute>:<second> - Manually sets the values for all time fields (all arguments are needed)
+	- u(pdate) - Force a NIST Time update, provided that the device is connected to a netork that has internet access.
+	- s(erver):<time server hostname/ip> - Enter an address for the time server.
+	- n(ist)<0/1> - Enable or disable NIST time updates.
+	- f(requency)<value> - Set the update frequency (in minutes) to update from the NIST server (Must be non-zero).
+
+Data Field Entry '/f'
+	- <Address>:<Label>:<Name (For post method)>:<

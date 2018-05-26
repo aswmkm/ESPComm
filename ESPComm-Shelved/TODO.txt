@@ -1,0 +1,26 @@
+Admin page
+ - Devie ID
+ - Router Autoconnect 
+ - Auto AP mode startup on connect failure? (Probably a good idea)
+ - Serial commands via http? (true remote access!)
+ - SQL server port, IP, password, user, ETC.
+ - default admin password creation (stored in eeprom?)
+ - user config overrides?
+ - default IP / gateway / subnet etc
+ - DNS nameserver 
+ - Auto update override
+ - Disable logins?
+ - Other overrides/defaults for config settings
+ - Remove data fields from index
+ - System Time Settings
+ - time server settings (Time zone, etc)
+
+Custom fields for specific sets of settings (tables or at least a custom header)
+ - Would need additional argument in the field creation command. 
+ - Would also require more RAM (Need to work on memory management stuff)
+
+- Minimize String object usage (Set char buffers for DataField stuff).
+- Progmem more strings
+- Muti-language support (that's a lot of strings...)(needed?)
+- Get world time over network?  
+- System time setting via serial?
