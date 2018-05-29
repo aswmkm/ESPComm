@@ -19,7 +19,7 @@ public slots:
     void onTCPSocketClosed();
 
 signals:
-    void forwardString( QString ); //Send the compiled string to the server for further processing
+    void forwardString( const QString & ); //Send the compiled string to the server for further processing
     void socketClosed( ClientSocket * );
 
 private:

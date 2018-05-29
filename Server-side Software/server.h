@@ -28,10 +28,17 @@ public:
     bool LoadConfigFromFile( const QString & ); //Loads the confguration data from a specific file
     //uint &GetSQLPort(){ return i_sqlPort; } //Return the SQL port number.
     //uint &GetTCPPort(){ return i_tcpPort; } //Return the TCP port number
-    void printToConsole( QString, uint = VERBOSE_PRIORITY::PRIORITY_LOW ); //This sends text to the terminal thread.
+    void printToConsole( const QString &, uint = VERBOSE_PRIORITY::PRIORITY_LOW ); //This sends text to the terminal thread.
     //QString &GetSQLHostname(){ return settingsMap->value(); } //Return the hostname string
     bool beginSQLConnection( uint ); // This function attempts to establish the connection to the SQL server where data is stored. Settings are class member variables.
     bool beginTCPServer( uint ); // This function allows TCP/IP connections (for data reception) to be made to the host device. Settings are class member variables.
+    //The functions below handle parsed args from parseConsoleMessage
+    void handleCloseServers( const QStringList & );
+    void handleBeginServers( const QStringList & );
+    void handleSetConfig( const QStringList & );
+    //
+    void closeTCPServer();
+
 
 private: //member variables and whatnots - mostly config related
     QSqlDatabase *p_Database; // database pointer
@@ -41,10 +48,10 @@ private: //member variables and whatnots - mostly config related
     QVector<ClientSocket *> p_Sockets; //a list of all of the client sockets
 
 public slots: //data received from other objects
-    void parseConsoleMessage( QString );
+    void parseConsoleMessage( const QString & );
     void onClientConnected(); //Handles the connection of a new client socket
     void onClientDisconnected( ClientSocket * ); //Handles the disconnection of a client socket
-    void onClientCommunication( QString ); //This handles the data from connected client sockets.
+    void onClientCommunication(QString); //This handles the data from connected client sockets.
 
 
 signals: //data sent to other objects in the project (most likely ust the user interface)

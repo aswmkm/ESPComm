@@ -35,10 +35,7 @@ void Terminal::run() //Code thet gets called for each thread.
 
 
         if ( s_input == CMD_EXIT || s_input == CMD_QUIT )
-        {
-            emit forwardToBackend(CMD_CLOSE);
             break; //end the loop
-        }
         else
             emit forwardToBackend(s_input); //Send directly to the backend for now
     }

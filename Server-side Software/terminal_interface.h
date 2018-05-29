@@ -33,7 +33,7 @@ public slots: //data received from other objects
     void displayMessage( QString msg ); //Accepts messages from signals
 
 signals: //to be sent to other objects
-    void forwardToBackend( QString msg ); //Used to forward user statements to the server backend for parsing.
+    void forwardToBackend( const QString &msg ); //Used to forward user statements to the server backend for parsing.
 };
 
 #endif // TERMINAL_INTERFACE_H

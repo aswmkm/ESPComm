@@ -7,7 +7,7 @@ BackendServer::BackendServer() //default configuration data
 {
     //Create the settings map here.
     settingsMap = new QMap<QString, QString>();
-    settingsMap->insert(CONFIG_SQL_HOSTNAME, "");
+    settingsMap->insert(CONFIG_SQL_HOSTNAME, "localhost");
     settingsMap->insert(CONFIG_SQL_PORT, QString().number(DEFAULT_SQL_PORT) );
     settingsMap->insert(CONFIG_SQL_DBTYPE, "QMYSQL" );
     settingsMap->insert(CONFIG_SQL_DBNAME, "");
@@ -28,6 +28,9 @@ BackendServer::BackendServer() //default configuration data
 }
 BackendServer::~BackendServer()
 {
+    closeTCPServer(); //just in case
+    p_Database->close();
+
     delete settingsMap;
     delete p_Server;
     delete p_Database;
@@ -91,7 +94,7 @@ bool BackendServer::LoadConfigFromFile(const QString &filename )
     return true;
 }
 
-void BackendServer::printToConsole(QString msg, uint verbose )
+void BackendServer::printToConsole( const QString &msg, uint verbose )
 {
     if ( settingsMap->value(CONFIG_VERBOSITY).toUInt() < verbose )// setting is less then passed in value? HIGHER INPUT VALUE = LOWER PRIORITY MESSAGE
         return; //just end here
@@ -101,8 +104,14 @@ void BackendServer::printToConsole(QString msg, uint verbose )
 
 bool BackendServer::beginSQLConnection( uint port )
 {
-    //p_Database->set
-    return true;
+    p_Database->addDatabase( settingsMap->value(CONFIG_SQL_DBTYPE) );
+    p_Database->setHostName( settingsMap->value(CONFIG_SQL_HOSTNAME) );
+    p_Database->setDatabaseName( settingsMap->value(CONFIG_SQL_DBNAME) );
+    p_Database->setUserName( settingsMap->value( CONFIG_SQL_DBUSER) );
+    p_Database->setPassword( settingsMap->value( CONFIG_SQL_DBPASS) );
+    p_Database->setPort( port );
+
+    return p_Database->open(); //Attempt to open the connection with the args that were passed.
 }
 
 bool BackendServer::beginTCPServer( uint port )
@@ -119,32 +128,24 @@ bool BackendServer::beginTCPServer( uint port )
         return true;
     }
 
+    printToConsole( QString("Failed to start server on port: ").append(port) );
     return false;
 }
-void BackendServer::parseConsoleMessage(QString msg)
+void BackendServer::parseConsoleMessage(const QString &msg)
 {
-    if ( msg == CMD_CLOSE )
+    QStringList commands = msg.split("-"); //cmd_split -cmd arg
+    commands[0].remove(" "); //remove whitespaces for first command after splitting
+
+    //"close -tcp args -sql args2" -> "close " "tcp args" "sql args2"
+
+    if ( commands[0] == CMD_BEGIN )
     {
-        if ( p_Server->isListening() ) //TCP server
-        {
-            printToConsole( QString("Closing TCP Server...") );
-            for ( int x = 0; x < p_Sockets.size(); x++ ) //force all connected client to close
-            {
-                p_Sockets[x]->getTcpSocket()->write("TCP Server Closing"); //Inform the client
-                p_Sockets[x]->getTcpSocket()->close(); //force it to close.
-            }
-            p_Sockets.clear(); //empty the clients list.
-            p_Server->close(); //don't allow new connections
-        }
-        if ( p_Database->isOpen() ) //SQL server
-        {
-            printToConsole( QString("Closing Database Connection...") );
-            p_Database->close();
-        }
+        if ( commands.size() < 2 )
+            printToConsole("Usage: -(all/tcp/sql) -args(optional, see documentation)");
+        else
+            handleBeginServers( commands );
     }
-    else if ( msg == CMD_BEGIN )
-        beginTCPServer( settingsMap->value(CONFIG_TCP_PORT).toUInt() );
-    else if ( msg == CMD_CLIENTS )
+    else if ( commands[0] == CMD_CLIENTS )
     {
         if( !p_Server->isListening() )
         {
@@ -162,14 +163,94 @@ void BackendServer::parseConsoleMessage(QString msg)
         for ( int x = 0; x < p_Sockets.size(); x++ )
             printToConsole( QString().number(x) + ": " + p_Sockets[x]->getTcpSocket()->localAddress().toString(), VERBOSE_PRIORITY::PRIORITY_HIGH );
     }
+    else if ( commands[0] == CMD_CLOSE ) // CLOSING SERVICES
+    {
+        if ( commands.size() < 2 ) //no args?
+        {
+            printToConsole("Usage: close -(all/tcp/sql)");
+            return;
+        }
+        else
+            handleCloseServers( commands );
+    }
+    else if ( commands[0] == CMD_CONFIG )
+    {
+
+    }
+    else
+        printToConsole( QString("Unknown command: ") + commands[0] );
+}
+
+void BackendServer::handleBeginServers(const QStringList &args)
+{
+    for ( int x = 1; x < args.size(); x++ )
+    {
+        QStringList values = args[x].split(" ");
+        if ( values[0] == "tcp" )
+        {
+            if ( values.size() < 2 && !beginTCPServer( settingsMap->value(CONFIG_TCP_PORT).toUInt() ) )
+                printToConsole( QString("Failed to open TCP server on port: ") + settingsMap->value(CONFIG_TCP_PORT) );
+            else if ( !beginTCPServer(values[1].toUInt() ) )
+                printToConsole( QString("Failed to open TCP server on port: ") + values[1] );
+        }
+        else if ( values[0] == "sql ")
+        {
+            if ( values.size() < 2 && !beginSQLConnection( settingsMap->value(CONFIG_SQL_PORT).toUInt() ))
+                printToConsole( QString("Failed to open SQL connection on port: ") + settingsMap->value(CONFIG_SQL_PORT) );
+            else if ( beginSQLConnection( values[1].toUInt() ) )
+                printToConsole( QString("Failed to open SQL connection on port: ") + values[1] );
+        }
+    }
+}
+
+void BackendServer::closeTCPServer()
+{
+    for ( int x = 0; x < p_Sockets.size(); x++ ) //force all connected client to close
+    {
+        p_Sockets[x]->getTcpSocket()->write("TCP Server Closing"); //Inform the client
+        p_Sockets[x]->getTcpSocket()->close(); //force it to close.
+    }
+    p_Sockets.clear(); //empty the clients list.
+    p_Server->close(); //don't allow new connections
+}
+
+void BackendServer::handleCloseServers(const QStringList &args)
+{
+    QStringList values = args[1].split(" "); //we only need to use the first arg here.
+    //"tcp args" -> "tcp" "args"
+    //"sql args2" -> "sql" "args2"
+    if ( values[0] == "tcp" || values[0] == "all")
+    {
+        if ( p_Server->isListening() ) //TCP server
+        {
+            printToConsole( "Closing TCP Server..." );
+            closeTCPServer();
+        }
+        else
+            printToConsole( "TCP Server is not running.");
+    }
+    if ( values[0] == "sql" || values[0] == "all" )
+    {
+        if ( p_Database->isOpen() ) //SQL server
+        {
+            printToConsole( QString("Closing Database Connection...") );
+            p_Database->close();
+        }
+        else
+            printToConsole("SQL Server is not running.");
+    }
+}
+
+void BackendServer::handleSetConfig(const QStringList &args)
+{
+
 }
 
 void BackendServer::onClientConnected()
 {
-    //p_Server->
     ClientSocket *connection = new ClientSocket(p_Server->nextPendingConnection());
     connect( connection, SIGNAL(socketClosed( ClientSocket *)), this, SLOT( onClientDisconnected( ClientSocket *) ) );
-    connect( connection, SIGNAL(forwardString(QString)), this, SLOT(onClientCommunication(QString))); //for handling incoming data
+    connect( connection, SIGNAL(forwardString(const QString &)), this, SLOT(onClientCommunication(QString))); //for handling incoming data
 
     QString clientAddress = connection->getTcpSocket()->localAddress().toString();
 
@@ -197,7 +278,8 @@ void BackendServer::onClientDisconnected( ClientSocket *socket )
     {
         printToConsole("Client disconnected.");
         printToConsole( QString().number(p_Sockets.size()) );//debug
-        delete socket;
+        socket->deleteLater();
+        //delete socket;
     }
 }
 
