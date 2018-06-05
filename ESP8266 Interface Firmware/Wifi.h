@@ -25,6 +25,7 @@
 #include <ESP8266WiFiGeneric.h>
 #include <ESP8266WiFiAP.h>
 #include <ESP8266WiFi.h>
+#include <user_interface.h> //access to some lower level functionality
 //
 
 #include <EEPROM.h> //EEPROM stuff.
@@ -32,14 +33,16 @@
 using namespace std;
 
 #define MAX_BUFFERSIZE 64 //limited by default max serial buffer size on arduino
-#define NULL_CHAR '/0'
+#define NULL_CHAR '\0'
+#define CR_CHAR '\r'
 #define SERIAL_BAUD 115200 //This seems adequate.
 #define CONNECT_RETRIES 10
 
 //EEPROM settings -- DO NOT MODIFY THESE UNLESS YOU KNOW WHAT YOU'RE DOING.
+#define MAX_EEPROM_BYTES 512
 #define WIFI_SSID_LENGTH 32
-#define WIFI_PASSWORD_LENGTH 32
-#define TCP_SERVERIP_LENGTH 16 //Maximum length for string that stores IP address.
+#define WIFI_PASSWORD_LENGTH 64
+#define TCP_SERVERIP_LENGTH 64 //Maximum length for string that stores IP address.
 #define TCP_PORT_LENGTH 5 //max chars needed for port number
 //
 
@@ -54,6 +57,7 @@ const char CMD_DISCONNECT = 'D',
 		CMD_IGNORE = 'X', //Command that tells the parser to exit early, and forward the buffer to the TCP port (optimization)
 		CMD_NETINFO = 'I'; //request current network info <if connected>
 		
+
 //Function definitions below:
 //Descr: This function checks to see if there is data available to read from the hardware serial, and parses/distributes it accordingly. 
 //Output: returns false if no valid command was found, otherwise true.

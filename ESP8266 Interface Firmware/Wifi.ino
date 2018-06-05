@@ -10,14 +10,15 @@ WiFiEventHandler disconnectedEventHandler;
 void setup()
 {
 	/* add setup code here */
-	EEPROM.begin(512); //default size for now. More than we need anyway
+	EEPROM.begin(MAX_EEPROM_BYTES); //default size for now. More than we need anyway
 	Serial.begin(SERIAL_BAUD);
 	
-	loadDefaultConnection();
-	
-	WiFi.mode( WIFI_STA );//Station mode only, do not enable access point mode.
+	WiFi.mode( WiFiMode_t::WIFI_OFF );//Start with all wifi disabled, to save power
+	wifi_ServerConnection.
 	WiFi.enableAP( false ); //Forcefully disable access point mode, just in case.
-	WiFi.setAutoReconnect( true ); //Default to auto-reconnect
+	WiFi.setAutoReconnect( false ); //Default to auto-reconnect - off
+	
+	loadDefaultConnection();
 	
 	disconnectedEventHandler = WiFi.onStationModeDisconnected([](const WiFiEventStationModeDisconnected& event)
 	{
@@ -30,14 +31,13 @@ void loop()
 {
 	if ( wifi_ServerConnection.connected() && wifi_ServerConnection.available() ) //incoming from TCP port?
 	{
-		char tcpBuffer[MAX_BUFFERSIZE];
-		wifi_ServerConnection.readBytesUntil('/r', tcpBuffer, MAX_BUFFERSIZE - 1 );
-		Serial.print(tcpBuffer); //Forward to the serial port.
+		char tcpBuffer[MAX_BUFFERSIZE] = { NULL_CHAR };
+		wifi_ServerConnection.readBytesUntil(CR_CHAR, tcpBuffer, MAX_BUFFERSIZE - 1 );
+		Serial.println(tcpBuffer); //Forward to the serial port.
 	}
 	
 	parseSerialData(); //Check for serial data input, and handle it.
 }
-
 void saveDefaultConnection()
 {
 	//Starting positions for each var
@@ -46,32 +46,25 @@ void saveDefaultConnection()
 	uint8_t i_Port = i_TCPIP + TCP_SERVERIP_LENGTH;// (IP + IP_LENGTH)
 	//
 	
-	//if ( WiFi.isConnected() )
-	//{
-		char testPW[] = { "ASSHole Test" };
-		for ( uint8_t x = 0; x < WIFI_SSID_LENGTH; x++ )
-		{
-			if ( x <= strlen(WiFi.SSID().c_str()))
-				EEPROM.write(x, WiFi.SSID().c_str()[x] );
-			else //Write blanks otherwise.
-				EEPROM.write(x, NULL_CHAR );
-		}
+	if ( WiFi.isConnected() )
+	{
+		struct station_config conf;
+		wifi_station_get_config(&conf); //Fetch the current wifi configuration
+		
+		Serial.println(F("Saving WiFi credentials..."));
+		for ( uint8_t x = 0; x < WIFI_SSID_LENGTH - 1; x++ )
+				EEPROM.write(x, conf.ssid[x]);
 			
-		for ( uint8_t x = 0; x < WIFI_PASSWORD_LENGTH; x++ )
-		{
-			if ( x <= strlen(testPW) )
-				EEPROM.write(x + i_passWD, testPW[x] );
-			else //Write blanks otherwise
-				EEPROM.write(x + i_passWD, NULL_CHAR );
-		}
+		for ( uint8_t x = 0; x < WIFI_PASSWORD_LENGTH - 1; x++ )
+			EEPROM.write(x + i_passWD, conf.password[x] );
 		
 		
 		if ( wifi_ServerConnection.connected() ) //save TCP related stuff?
 		{
 			String ipStr = wifi_ServerConnection.localIP().toString();
 			String portStr = String( wifi_ServerConnection.localPort() );
-			
-			for ( uint8_t x = 0; x < TCP_SERVERIP_LENGTH; x++ )
+			Serial.println(F("Saving TCP server credentials..."));
+			for ( uint8_t x = 0; x < TCP_SERVERIP_LENGTH - 1; x++ )
 			{
 				if ( x <= ipStr.length() )
 					EEPROM.write(x + i_TCPIP, ipStr.c_str()[x] );
@@ -79,7 +72,7 @@ void saveDefaultConnection()
 					EEPROM.write(x + i_TCPIP, NULL_CHAR );
 			}
 			
-			for ( uint8_t x = 0; x < TCP_PORT_LENGTH; x++ )
+			for ( uint8_t x = 0; x < TCP_PORT_LENGTH - 1; x++ )
 			{
 				if ( x <= portStr.length() )
 					EEPROM.write(x + i_Port, portStr.c_str()[x] );
@@ -87,7 +80,13 @@ void saveDefaultConnection()
 					EEPROM.write(x + i_Port, NULL_CHAR );
 			}
 		}
-	//}
+	}
+	else //Just clear the entire eeprom if there's nothing going on
+	{
+		Serial.println(F("No Connections Established. Clearing EEPROM."));
+		for ( unsigned int x = 0; x < MAX_EEPROM_BYTES; x++ )
+			EEPROM.write(x, NULL_CHAR);
+	}
 	EEPROM.commit(); //Write the data
 }
 
@@ -99,31 +98,54 @@ void loadDefaultConnection()
 	uint8_t i_Port = i_TCPIP + TCP_SERVERIP_LENGTH;// (IP + IP_LENGTH)
 	//
 	
-	char c_tempIP[TCP_SERVERIP_LENGTH];
-	char c_tempPort[TCP_PORT_LENGTH];
-	char c_WiFi_SSID[WIFI_SSID_LENGTH];
-	char c_WiFi_Password[WIFI_PASSWORD_LENGTH];
+	char c_TCPAddr[TCP_SERVERIP_LENGTH] = { NULL_CHAR };
+	char c_TCPPort[TCP_PORT_LENGTH] = { NULL_CHAR };
+	char c_WiFi_SSID[WIFI_SSID_LENGTH] = { NULL_CHAR };
+	char c_WiFi_Password[WIFI_PASSWORD_LENGTH] = { NULL_CHAR };
 	
-	for ( uint8_t x = 0; x < WIFI_SSID_LENGTH; x++ )
-		c_WiFi_SSID[x] = char(EEPROM.read(x)); //This starts at x = 0
+	for ( uint8_t x = 0; x < WIFI_SSID_LENGTH - 1; x++ )
+	{
+		char e_c = EEPROM.read(x);
+		if ( e_c == NULL_CHAR )
+			break;
+			
+		c_WiFi_SSID[x] = e_c; //This starts at x = 0
+	}
 	
-	for ( uint8_t x = 0; x < WIFI_PASSWORD_LENGTH; x++ )
-		c_WiFi_Password[x] = char(EEPROM.read(x + i_passWD));
+	for ( uint8_t x = 0; x < WIFI_PASSWORD_LENGTH - 1; x++ )
+	{
+		char e_c = EEPROM.read(x + i_passWD);
+		if ( e_c == NULL_CHAR )
+			break;
+		
+		c_WiFi_Password[x] = e_c;
+	}
 	
-	for ( uint8_t x = 0; x < TCP_SERVERIP_LENGTH; x++ )
-		c_tempIP[x] = char(EEPROM.read(x + i_TCPIP));
+	for ( uint8_t x = 0; x < TCP_SERVERIP_LENGTH - 1; x++ )
+	{
+		char e_c = EEPROM.read(x + i_TCPIP);
+		if ( e_c == NULL_CHAR )
+			break;
+			
+		c_TCPAddr[x] = e_c;
+	}
 	
-	for ( uint8_t x = 0; x < TCP_PORT_LENGTH; x++ )
-		c_tempPort[x] = char(EEPROM.read(x + i_Port));
+	for ( uint8_t x = 0; x < TCP_PORT_LENGTH - 1; x++ )
+	{
+		char e_c = EEPROM.read(x + i_Port);
+		if ( e_c == NULL_CHAR )
+			break;
+			
+		c_TCPPort[x] = e_c;
+	}
 	
-	//beginConnection( String(c_WiFi_SSID), String(c_WiFi_Password) );
-	//if ( WiFi.isConnected() ) //Connection successful?
-	//	beginTCPConnection( String(c_tempIP), parseInt( String(c_tempPort) ) );
-	
-	Serial.println(c_WiFi_SSID);
-	Serial.println(c_WiFi_Password);
-	Serial.println(c_tempIP);
-	Serial.println(c_tempPort);
+	if ( strlen(c_WiFi_SSID) ) //must at least have an SSID to connect to.
+	{
+		beginConnection( String(c_WiFi_SSID), String(c_WiFi_Password) );
+		
+		if ( WiFi.isConnected() && strlen(c_TCPPort) && strlen(c_TCPAddr) )
+			beginTCPConnection( String(c_TCPAddr), parseInt( String(c_TCPPort) ) );
+	}
 }
 
 
@@ -135,7 +157,6 @@ void parseSerialData()
 	if ( Serial.available() ) //Have something in the serial buffer?
 	{
 		Serial.readBytesUntil( NULL_CHAR, buffer, MAX_BUFFERSIZE - 1 ); //read into the buffer.
-		Serial.println(String("Echo: ") + String(buffer) );
 		uint8_t length = strlen(buffer);
 		for ( int pos = 0; pos < length ; pos++ )
 		{
@@ -291,7 +312,7 @@ void parseConnect( const vector<String> &args )
 		beginConnection( args[0], args[1] ); //Normal connection method
 	}
 	else
-		Serial.println( F("Not enough arguments to connect to network.") );
+		Serial.println( F("Usage: <SSID>:PASSWORD> - See documentation for additional information.") );
 }
 
 void parseTCPConnect( const vector<String> &args )
@@ -301,7 +322,7 @@ void parseTCPConnect( const vector<String> &args )
 		beginTCPConnection( args[0], parseInt(args[1]) );
 	}
 	else
-		Serial.println( F("Not enough args to connect to data server.") );
+		Serial.println( F("Usage: <SERVER ADDRESS>:<PORT>" ) );
 }
 
 long parseInt( const String &str )
@@ -317,7 +338,6 @@ long parseInt( const String &str )
 	
 	return tempstr.toInt(); //Will return 0 if buffer does not contain data. (safe)
 }
-
 
 void printDiag()
 {
@@ -341,10 +361,19 @@ void printDiag()
 	}
 	
 	Serial.println( PSTR("Network Status: ") + stat );
-	Serial.println( PSTR("IP: ") + WiFi.localIP().toString() );
-	Serial.println( PSTR("Gateway: ") + WiFi.gatewayIP().toString() );
-	Serial.println( PSTR("Subnet: ") + WiFi.subnetMask().toString() );
+	if ( WiFi.isConnected() )
+	{
+		Serial.println( PSTR("SSID: ") + WiFi.SSID() );
+		Serial.println( PSTR("IP: ") + WiFi.localIP().toString() );
+		Serial.println( PSTR("Gateway: ") + WiFi.gatewayIP().toString() );
+		Serial.println( PSTR("Subnet: ") + WiFi.subnetMask().toString() );
+	}
 	Serial.println( PSTR("MAC: ") + WiFi.macAddress() );
+	if ( wifi_ServerConnection.connected() )
+	{
+		Serial.println( String("TCP/IP Server: ") + wifi_ServerConnection.remoteIP().toString() );
+		Serial.println( String("TCP/IP Port: ") + wifi_ServerConnection.remotePort() );
+	}
 	
 	//Serial.println( PSTR("Available ESP system memory: ") + String(system_get_free_heap_size()) + " bytes." );
 }
@@ -357,6 +386,14 @@ void beginConnection( const String &ssid, const String &password )
 		return;
 	}
 	
+	if( WiFi.getMode() == WiFiMode_t::WIFI_OFF )
+	{
+		if ( !WiFi.mode( WIFI_STA ) ) //enable station mode only, do not enable access point mode.
+			Serial.println(F("Failed to enable WiFi device.") );
+	}
+		
+	struct station_config conf;
+	wifi_station_get_config(&conf);
 	Serial.println( "Attempting connection to: " + ssid );
 
 	if ( WiFi.begin( ssid.c_str(), password.c_str() ) == WL_CONNECT_FAILED )
@@ -389,13 +426,19 @@ void beginConnection( const String &ssid, const String &password )
 void beginTCPConnection( const String &addr, unsigned int port )
 {
 	if ( !WiFi.isConnected() )
+	{
 		Serial.println(F("Must be connected to network before establishing TCP connection."));
+		return;
+	}
 		
 	closeTCPConnection(); //Force it to stop if already open.
 		
 	Serial.print(String("Connection to server at ") + addr + String(" at port ") + String(port) );
 	if ( wifi_ServerConnection.connect( addr, port ) )
+	{
 		Serial.println(" successful.");
+		wifi_ServerConnection.keepAlive(); //keep the connection active
+	}
 	else 
 		Serial.println(" failed.");
 }
@@ -404,22 +447,14 @@ void closeTCPConnection()
 {
 	if ( wifi_ServerConnection.connected() ) //Already connected?
 	{
+		wifi_ServerConnection.disableKeepAlive();
 		wifi_ServerConnection.stop(); //Then force it to stop
-		Serial.println("Closing connection to server.");
+		Serial.println(F("Closing connection to server."));
 	}
 }
 
 void scanNetworks()
 {
-	/*if ( WiFi.isConnected() )
-	{
-		sendMessage( "Connected to '" + WiFi.SSID() + "'. Disconnect before scanning for networks.", true );
-		return;
-	}*/
-		
-	//WiFi.mode(WIFI_AP_STA);
-	//closeConnection( false ); //Just in case
-	//delay(100);
 	int n = WiFi.scanNetworks(); //More than 255 networks in an area? Possible I suppose.
 	if (!n)
 		Serial.println( F("No networks found" ) );
@@ -433,7 +468,6 @@ void scanNetworks()
 			delay(10);
 		}
 	}
-	//WiFi.mode(WIFI_OFF);
 }
 
 void closeConnection( )
@@ -452,6 +486,6 @@ void closeConnection( )
 	WiFi.setAutoReconnect( false );
 	//WiFi.softAPdisconnect( true ); //Close the AP, if open.
 	WiFi.disconnect(); //Disconnect the wifi
-	//WiFi.mode(WIFI_OFF);
+	WiFi.mode(WiFiMode_t::WIFI_OFF);
 }
 
