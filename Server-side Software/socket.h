@@ -10,7 +10,7 @@ class ClientSocket : public QTcpSocket
 {
     Q_OBJECT //signals/slots support
 public:
-    explicit ClientSocket( QTcpSocket *);
+    explicit ClientSocket( QTcpSocket * );
     QTcpSocket *getTcpSocket(){ return parent_socket; };
     ~ClientSocket();
 

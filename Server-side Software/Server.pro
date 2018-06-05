@@ -19,7 +19,9 @@ DEFINES += QT_DEPRECATED_WARNINGS
 SOURCES += main.cpp \
     terminal_interface.cpp \
     server.cpp \
-    socket.cpp
+    socket.cpp \
+    tcp.cpp \
+    sql.cpp
 
 HEADERS += \
     terminal_interface.h \

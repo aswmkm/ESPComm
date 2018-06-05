@@ -12,6 +12,7 @@
 #include <QMap>
 #include <QStringList>
 #include <QTextStream>
+#include <QDataStream>
 #include <QObject>
 #include <QtSql/QSqlDatabase>
 #include <QtNetwork/QTcpServer>
@@ -30,13 +31,15 @@ public:
     //uint &GetTCPPort(){ return i_tcpPort; } //Return the TCP port number
     void printToConsole( const QString &, uint = VERBOSE_PRIORITY::PRIORITY_LOW ); //This sends text to the terminal thread.
     //QString &GetSQLHostname(){ return settingsMap->value(); } //Return the hostname string
-    bool beginSQLConnection( uint ); // This function attempts to establish the connection to the SQL server where data is stored. Settings are class member variables.
-    bool beginTCPServer( uint ); // This function allows TCP/IP connections (for data reception) to be made to the host device. Settings are class member variables.
+    bool beginSQLConnection( const uint ); // This function attempts to establish the connection to the SQL server where data is stored. Settings are class member variables.
+    bool beginTCPServer( const uint ); // This function allows TCP/IP connections (for data reception) to be made to the host device. Settings are class member variables.
     //The functions below handle parsed args from parseConsoleMessage
     void handleCloseServers( const QStringList & );
     void handleBeginServers( const QStringList & );
     void handleSetConfig( const QStringList & );
+    void handleSendTCPData( const QStringList & ); //handles the sending of data to a specific client.
     //
+    QStringList parseConsoleArgs( const QString & ); //this function is responsible for breaking the input string from the console into usable args.
     void closeTCPServer();
 
 
@@ -51,7 +54,7 @@ public slots: //data received from other objects
     void parseConsoleMessage( const QString & );
     void onClientConnected(); //Handles the connection of a new client socket
     void onClientDisconnected( ClientSocket * ); //Handles the disconnection of a client socket
-    void onClientCommunication(QString); //This handles the data from connected client sockets.
+    void onClientCommunication( QString ); //This handles the data from connected client sockets.
 
 
 signals: //data sent to other objects in the project (most likely ust the user interface)

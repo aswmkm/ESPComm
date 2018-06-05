@@ -2,7 +2,8 @@
 #define COMMON_H
 
 const char CHAR_CONFIG_SPLIT = '=', //When parsing config files, we'll split on the equals sign. It just makes sense
-           CHAR_WHITESPACE = ' ';
+           CHAR_WHITESPACE = ' ',
+           CHAR_CR = '\r';
 
 const char
               //CLIENT COMMANDS BELOW HERE
@@ -14,6 +15,7 @@ const char
               CMD_LOADCFG[] = "loadcfg", //for loading custom config files?
               CMD_CLIENTS[] = "clients",
               CMD_CONFIG[] = "config",
+              CMD_SEND[] = "send", // for sending some data to a specific connected client.
               //
               //CONFIG FILE STRINGS BELOW HERE
               CONFIG_FILE[] = "config.cfg", //default config file name
@@ -34,6 +36,7 @@ const char
 #define DEFAULT_SQL_HOSTNAME "localhost"
 #define DEFAULT_TCP_PORT 1000 //Seems as good as any other?
 #define DEFAULT_TCP_MAXCONNECTIONS 10
+#define MAX_MSG_LENGTH 64 //Maximum message length when sending data to a client (64 is default MAX for arduino)
 
 enum VERBOSE_PRIORITY
 {

@@ -20,7 +20,7 @@ int main(int argc, char *argv[])
 
     //Connect signals/slots here
     a.connect(&serverTerminal,SIGNAL(finished()), &a, SLOT(quit())); //Needed to close the window once the terminal thread is closed.
-    serverBackend.connect(&serverBackend, SIGNAL(printMessage(QString)), &serverTerminal, SLOT(displayMessage(QString)));
+    serverBackend.connect(&serverBackend, SIGNAL(printMessage(QString)), &serverTerminal, SLOT(displayMessage(const QString &)));
     serverTerminal.connect(&serverTerminal, SIGNAL(forwardToBackend(QString)), &serverBackend, SLOT(parseConsoleMessage(QString)));
     //
 

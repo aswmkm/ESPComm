@@ -31,17 +31,18 @@ void Terminal::run() //Code thet gets called for each thread.
    forever //This loop is what processes all user inputs. if it ends, it should call for all other services to end as well.
    {
         cin->readLineInto(&s_input);
-        s_input = s_input.toLower(); //Convert to lowercase first
+        //s_input = s_input.toLower(); //Convert to lowercase first
+        QString cmd = s_input;
+        cmd.toLower();
 
-
-        if ( s_input == CMD_EXIT || s_input == CMD_QUIT )
+        if ( cmd == CMD_EXIT ||cmd == CMD_QUIT )
             break; //end the loop
         else
             emit forwardToBackend(s_input); //Send directly to the backend for now
     }
 }
 
-void Terminal::displayMessage(QString msg) //display the mes
+void Terminal::displayMessage(const QString &msg) //display the mes
 {
     *cout << msg << endl; //print the message to the console using the textstream
 }

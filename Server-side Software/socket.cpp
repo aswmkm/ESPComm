@@ -3,8 +3,10 @@
 ClientSocket::ClientSocket( QTcpSocket *socket )
 {
     parent_socket = socket;
-    connect(socket, SIGNAL(readyRead()), this, SLOT(AddToBuffer()) );
-    connect(socket, SIGNAL(disconnected()), this, SLOT(onTCPSocketClosed()));
+    parent_socket->setParent( this ); //this makes the QTcpSocket a child of this subclassed object (memory management)
+
+    connect(this, SIGNAL(readyRead()), this, SLOT(AddToBuffer()) );
+    connect(this, SIGNAL(disconnected()), this, SLOT(onTCPSocketClosed()));
 }
 
 ClientSocket::~ClientSocket()
