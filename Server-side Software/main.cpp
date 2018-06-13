@@ -15,8 +15,8 @@ int main(int argc, char *argv[])
 {
     QCoreApplication a(argc, argv);
 
-    BackendServer serverBackend; //TCP/SQL server object
-    Terminal serverTerminal; //User interface object
+    BackendServer serverBackend( &a ); //TCP/SQL server object
+    Terminal serverTerminal( &a ); //User interface object
 
     //Connect signals/slots here
     a.connect(&serverTerminal,SIGNAL(finished()), &a, SLOT(quit())); //Needed to close the window once the terminal thread is closed.

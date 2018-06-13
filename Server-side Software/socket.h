@@ -5,6 +5,10 @@
 #include <QTextStream>
 #include <QString>
 #include <QtNetwork/QTcpSocket>
+#include <QDateTime>
+#include <QHostAddress>
+#include <QTimeZone>
+#include "common.h"
 
 class ClientSocket : public QTcpSocket
 {
@@ -12,6 +16,9 @@ class ClientSocket : public QTcpSocket
 public:
     explicit ClientSocket( QTcpSocket * );
     QTcpSocket *getTcpSocket(){ return parent_socket; };
+    QString &getDeviceID(){ return s_deviceID; }
+    QString getAddress(){ return parent_socket->peerAddress().toString();}
+    bool sendMessage( const QString & );
     ~ClientSocket();
 
 public slots:
@@ -24,7 +31,9 @@ signals:
 
 private:
     QString s_buffer; //the char buffer
+    QString s_deviceID;
     QTcpSocket *parent_socket;
+    bool b_storingData;
 };
 
 #endif // SOCKET_H

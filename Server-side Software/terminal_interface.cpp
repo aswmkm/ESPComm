@@ -3,12 +3,13 @@
 #include <QTextStream>
 #include <QString>
 
-Terminal::Terminal() //Constructor
+Terminal::Terminal( QObject *parent ) //Constructor
 {
+    setParent( parent );
     cout = new QTextStream(stdout); //Output stream to console interface
     cin = new QTextStream(stdin); //Input stream from console interface
 
-    start();
+    start(); //begin the thread
 }
 Terminal::~Terminal() //Destructor
 {

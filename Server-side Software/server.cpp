@@ -3,8 +3,9 @@
 #include "socket.h"
 
 
-BackendServer::BackendServer() //default configuration data
+BackendServer::BackendServer( QObject *parent ) //default configuration data
 {
+    setParent( parent );
     //Create the settings map here.
     settingsMap = new QMap<QString, QString>();
     settingsMap->insert(CONFIG_SQL_HOSTNAME, "localhost");
@@ -105,7 +106,6 @@ void BackendServer::printToConsole( const QString &msg, uint verbose )
 QStringList BackendServer::parseConsoleArgs( const QString &msg )
 {
     QStringList args;
-    //args = msg.split("-");
     //So first we need to get the command being used, IE: send, clients, etc. Then we need to get the args, which are
     //annotated with the - char. Those args can have their own sets of args, which immediately follow.
     //So we need to read to the first space char or - to determine the command, then use the command to parse accordingly.
@@ -154,20 +154,7 @@ void BackendServer::parseConsoleMessage(const QString &msg)
             handleBeginServers( args );
     }
     else if ( args[0] == CMD_CLIENTS )
-    {
-        if( !p_Server->isListening() )
-            printToConsole("TCP is not running.", VERBOSE_PRIORITY::PRIORITY_HIGH);
-
-        else if ( !p_Sockets.size() )
-            printToConsole("No clients connected.", VERBOSE_PRIORITY::PRIORITY_HIGH );
-
-        else
-        {
-            printToConsole("Connected clients:", VERBOSE_PRIORITY::PRIORITY_HIGH );
-            for ( int x = 0; x < p_Sockets.size(); x++ )
-                printToConsole( QString().number(x) + ": " + p_Sockets[x]->getTcpSocket()->localAddress().toString(), VERBOSE_PRIORITY::PRIORITY_HIGH );
-        }
-    }
+        handleTCPClients( args );
     else if ( args[0] == CMD_CLOSE ) // CLOSING SERVICES
     {
         if ( args.size() < 2 ) //no args?
@@ -182,7 +169,7 @@ void BackendServer::parseConsoleMessage(const QString &msg)
     else if ( args[0] == CMD_SEND )
     {
         if ( args.size() < 3 ) //must have at least 3 args available (CMD_SEND)/client/data
-            printToConsole("Usage: -(client index #) (data)");
+            printToConsole("Usage: -(Client Index #) (data)");
         else
             handleSendTCPData( args );
     }
@@ -190,14 +177,12 @@ void BackendServer::parseConsoleMessage(const QString &msg)
         printToConsole( QString("Unknown command: ") + args[0] );
 }
 
-
-
 void BackendServer::handleBeginServers(const QStringList &args)
 {
     for ( int x = 1; x < args.size(); x++ )
     {
-        QStringList values = args[x].split(" ");
-        if ( values[0] == "tcp" )
+        QStringList values = args[x].split(CHAR_WHITESPACE);
+        if ( values[0] == CMD_TCP )
         {
             if ( values.size() < 2 )
             {
@@ -207,7 +192,7 @@ void BackendServer::handleBeginServers(const QStringList &args)
             else if ( !beginTCPServer(values[1].toUInt() ) )
                 printToConsole( QString("Failed to open TCP server on port: ") + values[1] );
         }
-        else if ( values[0] == "sql ")
+        else if ( values[0] == CMD_SQL )
         {
             if ( values.size() < 2 && !beginSQLConnection( settingsMap->value(CONFIG_SQL_PORT).toUInt() ))
                 printToConsole( QString("Failed to open SQL connection on port: ") + settingsMap->value(CONFIG_SQL_PORT) );
@@ -219,10 +204,10 @@ void BackendServer::handleBeginServers(const QStringList &args)
 
 void BackendServer::handleCloseServers(const QStringList &args)
 {
-    QStringList values = args[1].split(" "); //we only need to use the first arg here.
+    QStringList values = args[1].split(CHAR_WHITESPACE); //we only need to use the first arg here.
     //"tcp args" -> "tcp" "args"
     //"sql args2" -> "sql" "args2"
-    if ( values[0] == "tcp" || values[0] == "all")
+    if ( values[0] == CMD_TCP || values[0] == CMD_ALL )
     {
         if ( p_Server->isListening() ) //TCP server
         {
@@ -232,7 +217,7 @@ void BackendServer::handleCloseServers(const QStringList &args)
         else
             printToConsole( "TCP Server is not running.");
     }
-    if ( values[0] == "sql" || values[0] == "all" )
+    if ( values[0] == CMD_SQL || values[0] == CMD_ALL )
     {
         if ( p_Database->isOpen() ) //SQL server
         {
@@ -252,22 +237,21 @@ void BackendServer::handleSetConfig(const QStringList &args)
 void BackendServer::onClientConnected()
 {
     ClientSocket *connection = new ClientSocket(p_Server->nextPendingConnection());
-    //ClientSocket *connection = (ClientSocket *)p_Server->nextPendingConnection();
     connection->setParent( this );
 
     connect( connection, SIGNAL(socketClosed( ClientSocket *)), this, SLOT( onClientDisconnected( ClientSocket *) ) );
-    connect( connection, SIGNAL(forwardString(const QString &)), this, SLOT(onClientCommunication(QString))); //for handling incoming data
+    connect( connection, SIGNAL(forwardString(const QString &)), this, SLOT(onClientCommunication(const QString &))); //for handling incoming data
 
-    QString clientAddress = connection->getTcpSocket()->localAddress().toString();
+    QString clientAddress = connection->getAddress();
 
     if ( !settingsMap->value(CONFIG_TCP_DUPLICATECONNECTIONS).toUInt() ) //are we allowing duplicate client connections to the TCP server?
     {
         for ( int x = 0; x < p_Sockets.size(); x++ )
         {
-            if ( clientAddress == p_Sockets[x]->getTcpSocket()->localAddress().toString() ) //compare client addresses
+            if ( clientAddress == p_Sockets[x]->getAddress() ) //compare client addresses
             {
                 printToConsole("Connection already exists.");
-                connection->getTcpSocket()->write("#ERR1"); //duplicate clients not allowed?
+                connection->sendMessage("#ERR1"); //duplicate clients not allowed?
                 connection->getTcpSocket()->close(); //force it to close.
                 return; // end here
             }
@@ -282,14 +266,12 @@ void BackendServer::onClientDisconnected( ClientSocket *socket )
 {
     if ( p_Sockets.removeOne( socket ) ) //attempt to remove the socket from our list of valid clients.
     {
-        printToConsole("Client disconnected.");
-        printToConsole( QString().number(p_Sockets.size()) );//debug
+        printToConsole("Client at: " + socket->getAddress() + "(" + socket->getDeviceID() + ")" + " disconnected.");
         socket->deleteLater();
-        //delete socket;
     }
 }
 
-void BackendServer::onClientCommunication( QString msg ) //this handles any data that is received over the TCP sockets.
+void BackendServer::onClientCommunication( const QString &msg ) //this handles any data that is received over the TCP sockets.
 {
     printToConsole( msg );
 }

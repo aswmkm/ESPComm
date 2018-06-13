@@ -11,3 +11,16 @@ bool BackendServer::beginSQLConnection( const uint port )
 
     return p_Database->open(); //Attempt to open the connection with the args that were passed.
 }
+
+bool BackendServer::createDBTables( const QStringList &args )
+{
+    if ( !p_Database->isOpen() )
+    {
+        printToConsole("SQL Database not open.");
+        return false;
+    }
+
+    QSqlQuery query;
+    //query.
+    return true;
+}

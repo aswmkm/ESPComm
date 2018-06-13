@@ -18,7 +18,7 @@ class Terminal : public QThread
 {
     Q_OBJECT
 public:
-    Terminal(); //constructor
+    Terminal( QObject * ); //constructor
     ~Terminal(); //Desctructor
     template<typename T>
     void print( const T&, bool = false );

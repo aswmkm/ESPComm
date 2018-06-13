@@ -15,6 +15,7 @@
 #include <QDataStream>
 #include <QObject>
 #include <QtSql/QSqlDatabase>
+#include <QSqlQuery>
 #include <QtNetwork/QTcpServer>
 #include <QtNetwork/QTcpSocket>
 #include "socket.h"
@@ -24,7 +25,7 @@ class BackendServer : public QObject
 {
     Q_OBJECT
 public:
-    BackendServer();
+    BackendServer( QObject * );
     ~BackendServer();
     bool LoadConfigFromFile( const QString & ); //Loads the confguration data from a specific file
     //uint &GetSQLPort(){ return i_sqlPort; } //Return the SQL port number.
@@ -37,10 +38,17 @@ public:
     void handleCloseServers( const QStringList & );
     void handleBeginServers( const QStringList & );
     void handleSetConfig( const QStringList & );
+    void handleTCPClients( const QStringList & ); //handle the displaying of connected TCP clients, also handles forced connection closing.
     void handleSendTCPData( const QStringList & ); //handles the sending of data to a specific client.
     //
+    bool sendToSocket( uint, QString & ); //arguments are the socket index for the p_Sockets vector, and the message.
+    bool sendToSocket( ClientSocket *, QString & ); //arguments are a pointer to the socket, and the message
+
     QStringList parseConsoleArgs( const QString & ); //this function is responsible for breaking the input string from the console into usable args.
     void closeTCPServer();
+
+    const QSqlDatabase* getSQLDatabase(){ return p_Database; }
+    bool createDBTables( const QStringList & );
 
 
 private: //member variables and whatnots - mostly config related
@@ -48,13 +56,13 @@ private: //member variables and whatnots - mostly config related
     QTcpServer *p_Server; // server pointer
     QMap<QString, QString> *settingsMap; //store settings strings here.
 
-    QVector<ClientSocket *> p_Sockets; //a list of all of the client sockets
+    QVector<ClientSocket *> p_Sockets; //a vector of all of the client sockets
 
 public slots: //data received from other objects
     void parseConsoleMessage( const QString & );
     void onClientConnected(); //Handles the connection of a new client socket
     void onClientDisconnected( ClientSocket * ); //Handles the disconnection of a client socket
-    void onClientCommunication( QString ); //This handles the data from connected client sockets.
+    void onClientCommunication( const QString & ); //This handles the data from connected client sockets.
 
 
 signals: //data sent to other objects in the project (most likely ust the user interface)
