@@ -5,9 +5,10 @@
 
 BackendServer::BackendServer( QObject *parent ) //default configuration data
 {
-    setParent( parent );
+    setParent( parent ); //memory management
     //Create the settings map here.
     settingsMap = new QMap<QString, QString>();
+    settingsMap->insert(CONFIG_SQL_AUTOSTART, QString().number(0) );
     settingsMap->insert(CONFIG_SQL_HOSTNAME, "localhost");
     settingsMap->insert(CONFIG_SQL_PORT, QString().number(DEFAULT_SQL_PORT) );
     settingsMap->insert(CONFIG_SQL_DBTYPE, "QMYSQL" );
@@ -30,7 +31,7 @@ BackendServer::BackendServer( QObject *parent ) //default configuration data
 BackendServer::~BackendServer()
 {
     closeTCPServer(); //just in case
-    p_Database->close();
+    p_Database->close(); //close the database connection.
 
     delete settingsMap;
     delete p_Server;
@@ -42,24 +43,15 @@ bool BackendServer::LoadConfigFromFile(const QString &filename )
 
     if ( !configFile.exists() ) //Should we create a default config file?
     {
-        if ( !configFile.open( QIODevice::ReadWrite | QIODevice::Text ) ) //still can't create it for some reason?
+        if ( saveConfigFile( filename ) )
         {
-            printToConsole( QString("Failed to create default config file: ").append(filename), VERBOSE_PRIORITY::PRIORITY_HIGH );
+            printToConsole(QString("Successfully created new config file: ") + CONFIG_FILE);
+            return true;
+        }
+        else
             return false;
-        }
-
-        else //create the default confg file here, then close it.
-        {
-            QTextStream fOut(&configFile);
-            QMapIterator <QString, QString> i(*settingsMap); //needed to cleanly go through the entire settings map
-            while ( i.hasNext() )
-            {
-                i.next(); //advance the iterator each pass
-                fOut << i.key() << CHAR_CONFIG_SPLIT << i.value() << endl;
-            }
-            return true; //No need to continue here, since we just created the file from predefined settings.
-        }
     }
+
     else if (!configFile.open(QIODevice::ReadOnly | QIODevice::Text )) //it exists But it still won't open?
     {
         printToConsole( QString("Failed to open config file: ").append(filename), VERBOSE_PRIORITY::PRIORITY_HIGH );
@@ -70,7 +62,7 @@ bool BackendServer::LoadConfigFromFile(const QString &filename )
     while (!fIn.atEnd())
     {
         QString s_line = fIn.readLine(); //Store the line we've just read
-        if ( s_line[0] == '#' || s_line[0] == ';') //skip commented lines
+        if ( s_line[0] == CHAR_COMMENT_1 || s_line[0] == CHAR_COMMENT_2) //skip commented lines
             continue;
 
         QStringList cfgLine = s_line.split(CHAR_CONFIG_SPLIT);
@@ -90,8 +82,74 @@ bool BackendServer::LoadConfigFromFile(const QString &filename )
 
         }
     }
+    configFile.close();
+    printToConsole( filename + " loaded succesfully.", VERBOSE_PRIORITY::PRIORITY_MEDIUM );
+    return true;
+}
 
-    printToConsole(QString().append(filename).append(" loaded succesfully."), VERBOSE_PRIORITY::PRIORITY_MEDIUM );
+bool BackendServer::saveConfigFile(const QString &filename )
+{
+    QFile configFile(filename);
+
+    if ( !configFile.open( QIODevice::ReadWrite | QIODevice::Text ) ) //can't open or create it for some reason?
+    {
+        printToConsole( QString("Failed to create or open config file: ").append(filename), VERBOSE_PRIORITY::PRIORITY_HIGH );
+        return false;
+    }
+
+    QMapIterator <QString, QString> i(*settingsMap);
+    QVector<QMapIterator<QString, QString> *> parsedIterators; //pointers to the iterators that have been parsed and replaced in existing text
+    QString inputBuffer = configFile.readAll(), //read all chars into an input buffer for parsing.
+            outputBuffer; //buffer to store the final output for writing.
+
+    QStringList inputLines = inputBuffer.split(CHAR_NL); //split on newlines
+
+    for ( int x = 0; x < inputLines.size(); x++ ) //go through the lines
+    {
+        QStringList lineKeyValue = inputLines[x].split(CHAR_CONFIG_SPLIT);
+
+        if ( inputLines[x][0] == CHAR_COMMENT_1 || inputLines[x][0] == CHAR_COMMENT_2 || lineKeyValue.size() < 2 )
+        {
+            outputBuffer.append(inputLines[x] + CHAR_NL); //All the line to our output buffer and move on
+            continue;
+        }
+
+        lineKeyValue[0].remove(CHAR_WHITESPACE); //just to be sure, before we compare
+
+        i.toFront();
+        while ( i.hasNext() ) //we're going through all iterations of the settings map
+        {
+            i.next(); //advance
+            if ( lineKeyValue[0] == i.key() )//the config key in the line read from the buffer line matches the key from the iterated setting
+            {
+                parsedIterators.push_back( &i ); //make sure we don't do anything with this iterator later, since it exists already
+                if ( lineKeyValue[1] == i.value() ) //same value already exists in the file for this key, just move on.
+                {
+                    outputBuffer.append(inputLines[x] + CHAR_NL); //nothing changed, just append the entire existing line.
+                    break;
+                }
+                lineKeyValue[1] = i.value(); //set the new value
+                outputBuffer.append(lineKeyValue[0] + CHAR_CONFIG_SPLIT + lineKeyValue[1] + CHAR_NL);
+                break; //we've done what we needed to do. end this loop
+            }
+        }
+
+    }
+
+    i.toFront(); //reset iterator progression.
+    while ( i.hasNext() ) //now we're going through the keys of our settings map that were not previously addressed (non-existant or new config file?)
+    {
+        i.next(); //advance
+        if ( !parsedIterators.contains( &i ) ) //write values that haven't been overwritten or previously read (non existant?)
+            outputBuffer.append( i.key() + CHAR_CONFIG_SPLIT + i.value() + CHAR_NL );
+    }
+
+    //At the end of itall, we write the entire output buffer to our file.
+    configFile.resize(filename, outputBuffer.length() );
+    configFile.seek(0); //to go beginning of file.
+    configFile.write(outputBuffer.toLocal8Bit(), outputBuffer.length()); //write the output
+
+    configFile.close();
     return true;
 }
 
@@ -141,7 +199,7 @@ void BackendServer::parseConsoleMessage(const QString &msg)
     QStringList args = parseConsoleArgs( msg );
     //"close -tcp args -sql args2" -> "close " "tcp args" "sql args2"
 
-    if ( !args.size() ) //must have at east one arg
+    if ( !args.size() ) //must have at least one arg
         return;
 
     args[0].toLower(); //convert commands to lower case
@@ -164,7 +222,19 @@ void BackendServer::parseConsoleMessage(const QString &msg)
     }
     else if ( args[0] == CMD_CONFIG )
     {
-
+        if ( args.size() < 2 )
+        {
+            printToConsole("Usage: <config> <value>");
+            printToConsole("Available configuration settings and current settings: <setting>=<value>");
+            QMapIterator <QString, QString> i(*settingsMap); //needed to cleanly go through the entire settings map
+            while ( i.hasNext() )
+            {
+                i.next(); //advance the iterator each pass
+                printToConsole( i.key() + CHAR_CONFIG_SPLIT + i.value(), VERBOSE_PRIORITY::PRIORITY_HIGH );
+            }
+        }
+        else
+            handleSetConfig(args);
     }
     else if ( args[0] == CMD_SEND )
     {
@@ -181,23 +251,44 @@ void BackendServer::handleBeginServers(const QStringList &args)
 {
     for ( int x = 1; x < args.size(); x++ )
     {
-        QStringList values = args[x].split(CHAR_WHITESPACE);
-        if ( values[0] == CMD_TCP )
+        if ( args[x] == CMD_TCP )
         {
-            if ( values.size() < 2 )
+            uint port = 0;
+            if ( x + 1 < args.size() )
+                port = args[x+1].toUInt(); //attempt to convert to int. return 0 if invalid
+
+            if ( !port ) //no port number assigned, use default from config
             {
                 if ( !beginTCPServer( settingsMap->value(CONFIG_TCP_PORT).toUInt() ) )
                     printToConsole( QString("Failed to open TCP server on port: ") + settingsMap->value(CONFIG_TCP_PORT) );
             }
-            else if ( !beginTCPServer(values[1].toUInt() ) )
-                printToConsole( QString("Failed to open TCP server on port: ") + values[1] );
+            else
+            {
+                if ( !beginTCPServer( port ) )
+                {
+                    printToConsole( QString("Failed to open TCP server on port: ") + QString().number(port) );
+                    x++; //found a port, skip one iterator
+                }
+            }
         }
-        else if ( values[0] == CMD_SQL )
+        else if ( args[x] == CMD_SQL )
         {
-            if ( values.size() < 2 && !beginSQLConnection( settingsMap->value(CONFIG_SQL_PORT).toUInt() ))
-                printToConsole( QString("Failed to open SQL connection on port: ") + settingsMap->value(CONFIG_SQL_PORT) );
-            else if ( beginSQLConnection( values[1].toUInt() ) )
-                printToConsole( QString("Failed to open SQL connection on port: ") + values[1] );
+            uint port = 0;
+            if ( x + 1 < args.size() )
+                port = args[x+1].toUInt();
+            if ( !port )
+            {
+                if ( !beginSQLConnection( settingsMap->value(CONFIG_SQL_PORT).toUInt() ))
+                    printToConsole( QString("Failed to open SQL connection on port: ") + settingsMap->value(CONFIG_SQL_PORT) );
+            }
+            else
+            {
+                if ( !beginSQLConnection( port ) )
+                {
+                    printToConsole( QString("Failed to open SQL connection on port: ") + QString().number(port) );
+                    x++; //found a port, skip one iterator
+                }
+            }
         }
     }
 }
@@ -231,7 +322,35 @@ void BackendServer::handleCloseServers(const QStringList &args)
 
 void BackendServer::handleSetConfig(const QStringList &args)
 {
+    for ( int x = 1; x < args.size(); x++ )
+    {
+        if ( settingsMap->contains( args[x] ) )
+        {
+            if ( (x + 1) >= args.size() ) //make sure we've got an arg to server as a config value.
+            {
+                printToConsole("Missing value for config: " + args[x] );
+                break; //end here
+            }
 
+            if ( settingsMap->value(args[x]) == args[x+1] )
+                printToConsole("Value for " + args[x] + " unchanged.");
+            else
+            {
+                printToConsole("Setting value of " + args[x] + " to: " + args[x+1] );
+                settingsMap->operator [](args[x]) = args[x+1];
+            }
+            x++; //advance past the value.
+        }
+        else if ( args[x] == CMD_SAVE )//save the current configuration to the
+        {
+            if ( saveConfigFile(CONFIG_FILE) )
+                printToConsole(QString("Configuration successfully saved to: ") + CONFIG_FILE );
+            else
+                printToConsole(QString("Failed to save configuration to: ") + CONFIG_FILE );
+        }
+        else
+            printToConsole("Unknown setting: " + args[x] );
+    }
 }
 
 void BackendServer::onClientConnected()

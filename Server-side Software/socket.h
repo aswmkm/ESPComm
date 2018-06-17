@@ -18,7 +18,7 @@ public:
     QTcpSocket *getTcpSocket(){ return parent_socket; };
     QString &getDeviceID(){ return s_deviceID; }
     QString getAddress(){ return parent_socket->peerAddress().toString();}
-    bool sendMessage( const QString & );
+    TRANSMISSION_CONDITION sendMessage( const QString & );
     ~ClientSocket();
 
 public slots:

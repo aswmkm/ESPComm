@@ -30,22 +30,28 @@ void ClientSocket::AddToBuffer()
     if ( !length ) //Just to make sure..
         return;
 
-    if ( newData.contains(CHAR_FLAG_TIME) )
+    if ( newData.contains(CHAR_FLAG_TIME) ) //device is requesting a time update
     {
         //The following command is specifically formatted to work with the ATMC firmware.
-        parent_socket->write(QByteArray().append(QDateTime::currentDateTime().toString("'th'hh'm'mm's'ss' ty'yyyy' tr'M' td'd")).append(CHAR_CR) );
+        sendMessage( QDateTime::currentDateTime().toString("'th'hh'm'mm's'ss' ty'yyyy' tr'M' td'd").append(CHAR_CR) );
         //
-        return;
+        return; //just end here
     }
-    else if ( newData.contains(CHAR_FLAG_STORE_BEGIN) )
+    else if ( newData.contains(CHAR_FLAG_STORE_BEGIN) ) //data we are sending is to be stored into the SQL Database, and possibly in local storage
     {
         newData.remove(CHAR_FLAG_STORE_BEGIN);
         b_storingData = true;
     }
-    else if ( newData.contains(CHAR_FLAG_STORE_END) )
+    else if ( newData.contains(CHAR_FLAG_STORE_END) ) //end of data storage
     {
         newData.remove(CHAR_FLAG_STORE_END);
         b_storingData = false;
+    }
+    else if ( newData.contains(CHAR_FLAG_DEVID) )
+    {
+        newData.remove(CHAR_FLAG_DEVID);
+        s_deviceID = newData;
+        return; //just end here
     }
 
     if ( newData.contains(CHAR_NL) || newData.contains(CHAR_CR) ) //we're reading till a newline or carriage return?
@@ -60,19 +66,22 @@ void ClientSocket::AddToBuffer()
         s_buffer.append(newData); //just add it to the buffer.
 }
 
-bool ClientSocket::sendMessage(const QString &msg)
+TRANSMISSION_CONDITION ClientSocket::sendMessage(const QString &msg)
 {
+    if( msg.length() > MAX_MSG_LENGTH - 1 )
+        return TRANSMISSION_CONDITION::ERROR_MSGLEN;
+
     QByteArray block;
     block.append(msg);
 
-    if ( !msg.contains(CHAR_CR) )
+    if ( !msg.endsWith(CHAR_CR) )
         block.append(CHAR_CR); //all messages should end with a carriage return.
 
     getTcpSocket()->write(block);
     while ( getTcpSocket()->bytesToWrite() ) //do we have bytes that have yet to be written?
     {
        if ( !getTcpSocket()->waitForBytesWritten(/*timeout here*/) )
-           return false;
+           return TRANSMISSION_CONDITION::ERROR_GENERIC;
     }
-    return true;
+    return TRANSMISSION_CONDITION::ERROR_NONE;
 }

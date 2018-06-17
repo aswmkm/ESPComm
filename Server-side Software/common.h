@@ -6,6 +6,8 @@ const char
         CHAR_WHITESPACE = ' ',
         CHAR_CR = '\r',
         CHAR_NL = '\n',
+        CHAR_COMMENT_1 = ';',//used to parse comments in config files, etc.
+        CHAR_COMMENT_2 = '#', //used to parse comments in config files, etc.
         CHAR_FLAG_DEVID = 0x1, //SOH ascii char - nonprintable - used to indicate that we're receiving the connecting device ID for the socket.
         CHAR_FLAG_STORE_BEGIN = 0x2, //STX ascii char - nonprintable
         CHAR_FLAG_STORE_END = 0x4, //EOT ascii char - nonprintable
@@ -16,6 +18,7 @@ const char
         CMD_QUIT[] = "quit",
         CMD_BEGIN[] = "begin",
         CMD_CLOSE[] = "close",
+        CMD_SAVE[] = "save",
         CMD_RESTART[] = "restart",
         CMD_LOADCFG[] = "loadcfg", //for loading custom config files?
         CMD_CLIENTS[] = "clients",
@@ -27,6 +30,7 @@ const char
         //
         //CONFIG FILE STRINGS BELOW HERE
         CONFIG_FILE[] = "config.cfg", //default config file name
+        CONFIG_SQL_AUTOSTART[] = "sql_autostart",
         CONFIG_SQL_DBTYPE[] = "sql_dbtype",
         CONFIG_SQL_HOSTNAME[] = "sql_hostname",
         CONFIG_SQL_DBNAME[] = "sql_dbname",
@@ -51,6 +55,14 @@ enum VERBOSE_PRIORITY
     PRIORITY_HIGH = 0,
     PRIORITY_MEDIUM, //1
     PRIORITY_LOW //2
+};
+
+enum TRANSMISSION_CONDITION
+{
+    ERROR_GENERIC = 0,
+    ERROR_NONE, //1 (true)
+    ERROR_MSGLEN, //length of message is too long.
+    ERROR_TIMEOUT //transmission timed out
 };
 
 

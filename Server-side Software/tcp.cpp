@@ -33,18 +33,33 @@ void BackendServer::closeTCPServer()
 void BackendServer::handleSendTCPData(const QStringList &args )
 {
     int clientIndex = args[1].toUInt() - 1;
-    if ( clientIndex >= p_Sockets.size() || clientIndex < 0 )
+    if ( ( clientIndex >= p_Sockets.size() || clientIndex < 0 ) && args[1] != CMD_ALL )
     {
         printToConsole("Invalid client at index: " + QString().number(clientIndex + 1) );
         return; //end here
     }
-    //for ( int x = 2; x < args.size(); x++ ) //everything else is the message
-    if ( args[2].length() > MAX_MSG_LENGTH - 1 )
-        printToConsole("Message too long. Maximum characters is limited to: " + QString().number(MAX_MSG_LENGTH - 1) );
+
+    if ( args[1] == CMD_ALL )
+    {
+        for ( int x = 0; x < p_Sockets.size(); x++ )
+        {
+            TRANSMISSION_CONDITION trans = p_Sockets[x]->sendMessage(args[2]);
+            if ( trans == TRANSMISSION_CONDITION::ERROR_GENERIC )
+                printToConsole("Failed to send message to client at index: " + QString::number(x + 1) + "(" + p_Sockets[clientIndex]->getDeviceID() + ")" );
+            else if ( trans == TRANSMISSION_CONDITION::ERROR_MSGLEN )
+            {
+                printToConsole("Message too long. Maximum characters is limited to: " + QString().number(MAX_MSG_LENGTH - 1) );
+                return; //if the message is too long for one client, it's too long for the other. end the loop here here
+            }
+        }
+    }
     else
     {
-        if ( !p_Sockets[clientIndex]->sendMessage(args[2]) )
-            printToConsole("Failed to send message to client: " + QString::number(clientIndex + 1) );
+        TRANSMISSION_CONDITION trans = p_Sockets[clientIndex]->sendMessage(args[2]);
+        if ( trans == TRANSMISSION_CONDITION::ERROR_GENERIC )
+            printToConsole("Failed to send message to client at index: " + QString::number(clientIndex + 1) + "(" + p_Sockets[clientIndex]->getDeviceID() + ")" );
+        else if ( trans == TRANSMISSION_CONDITION::ERROR_MSGLEN )
+            printToConsole("Message too long. Maximum characters is limited to: " + QString().number(MAX_MSG_LENGTH - 1) );
     }
 }
 
@@ -99,7 +114,7 @@ void BackendServer::handleTCPClients(const QStringList & args)
         {
             printToConsole("Connected clients:", VERBOSE_PRIORITY::PRIORITY_HIGH );
             for ( int x = 0; x < p_Sockets.size(); x++ )
-                printToConsole( QString().number(x + 1) + ": " + p_Sockets[x]->getAddress(), VERBOSE_PRIORITY::PRIORITY_HIGH );
+                printToConsole( QString().number(x + 1) + ": " + p_Sockets[x]->getAddress() + "(" + p_Sockets[x]->getDeviceID() + ")", VERBOSE_PRIORITY::PRIORITY_HIGH );
         }
     }
 }

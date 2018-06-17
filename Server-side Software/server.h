@@ -28,10 +28,8 @@ public:
     BackendServer( QObject * );
     ~BackendServer();
     bool LoadConfigFromFile( const QString & ); //Loads the confguration data from a specific file
-    //uint &GetSQLPort(){ return i_sqlPort; } //Return the SQL port number.
-    //uint &GetTCPPort(){ return i_tcpPort; } //Return the TCP port number
+    bool saveConfigFile( const QString & ); //used to save configuration data to a file (File is created if it does nto exist)
     void printToConsole( const QString &, uint = VERBOSE_PRIORITY::PRIORITY_LOW ); //This sends text to the terminal thread.
-    //QString &GetSQLHostname(){ return settingsMap->value(); } //Return the hostname string
     bool beginSQLConnection( const uint ); // This function attempts to establish the connection to the SQL server where data is stored. Settings are class member variables.
     bool beginTCPServer( const uint ); // This function allows TCP/IP connections (for data reception) to be made to the host device. Settings are class member variables.
     //The functions below handle parsed args from parseConsoleMessage
