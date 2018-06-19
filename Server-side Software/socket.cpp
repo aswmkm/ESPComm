@@ -14,6 +14,7 @@ ClientSocket::ClientSocket( QTcpSocket *socket )
 ClientSocket::~ClientSocket()
 {
     delete parent_socket; //delete the pointer to the Tcp Socket
+    delete storageFile; //delete local storage
 }
 
 void ClientSocket::onTCPSocketClosed()
@@ -47,7 +48,7 @@ void ClientSocket::AddToBuffer()
         newData.remove(CHAR_FLAG_STORE_END);
         b_storingData = false;
     }
-    else if ( newData.contains(CHAR_FLAG_DEVID) )
+    else if ( newData.contains(CHAR_FLAG_DEVID) ) //the only time this should be used is when the client initially connects.
     {
         newData.remove(CHAR_FLAG_DEVID);
         s_deviceID = newData;

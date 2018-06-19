@@ -48,6 +48,13 @@ const char
 #define DEFAULT_SQL_HOSTNAME "localhost"
 #define DEFAULT_TCP_PORT 1000 //Seems as good as any other?
 #define DEFAULT_TCP_MAXCONNECTIONS 10
+
+//Maximum value limits (mostly for config settings)
+#define MAX_TCP_CONNECTIONS 64//absolute max allowed
+#define MAX_HOSTNAME_LENGTH 512 //512 characters seems plenty long enough for a hostname
+#define MAX_SQL_DBNAME 128
+#define MAX_SQL_USERNAME 128
+#define MAX_SQL_PASSWORD 128
 #define MAX_MSG_LENGTH 64 //Maximum message length when sending data to a client (64 is default MAX for arduino)
 
 enum VERBOSE_PRIORITY

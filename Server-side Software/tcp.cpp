@@ -9,7 +9,7 @@ bool BackendServer::beginTCPServer( const uint port )
     }
     if ( p_Server->listen(QHostAddress::Any, port) )
     {
-        p_Server->setMaxPendingConnections( settingsMap->value(CONFIG_TCP_MAXCONNECTIONS).toUInt() );
+        p_Server->setMaxPendingConnections( settingsMap->value(CONFIG_TCP_MAXCONNECTIONS).toInt() );
         printToConsole(QString("Listening for connections at address: ").append(p_Server->serverAddress().toString()).append(" on port: ").append(QString().number(p_Server->serverPort())));
         return true;
     }

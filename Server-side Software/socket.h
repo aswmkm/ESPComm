@@ -8,6 +8,7 @@
 #include <QDateTime>
 #include <QHostAddress>
 #include <QTimeZone>
+#include <QFile>
 #include "common.h"
 
 class ClientSocket : public QTcpSocket
@@ -15,9 +16,10 @@ class ClientSocket : public QTcpSocket
     Q_OBJECT //signals/slots support
 public:
     explicit ClientSocket( QTcpSocket * );
-    QTcpSocket *getTcpSocket(){ return parent_socket; };
+    QTcpSocket *getTcpSocket(){ return parent_socket; }
     QString &getDeviceID(){ return s_deviceID; }
     QString getAddress(){ return parent_socket->peerAddress().toString();}
+    //bool
     TRANSMISSION_CONDITION sendMessage( const QString & );
     ~ClientSocket();
 
@@ -30,9 +32,10 @@ signals:
     void socketClosed( ClientSocket * );
 
 private:
-    QString s_buffer; //the char buffer
-    QString s_deviceID;
+    QString s_buffer, //the char buffer
+            s_deviceID; //device ID (set upon connection)
     QTcpSocket *parent_socket;
+    QFile *storageFile;
     bool b_storingData;
 };
 

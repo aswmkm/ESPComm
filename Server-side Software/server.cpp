@@ -7,19 +7,19 @@ BackendServer::BackendServer( QObject *parent ) //default configuration data
 {
     setParent( parent ); //memory management
     //Create the settings map here.
-    settingsMap = new QMap<QString, QString>();
-    settingsMap->insert(CONFIG_SQL_AUTOSTART, QString().number(0) );
-    settingsMap->insert(CONFIG_SQL_HOSTNAME, "localhost");
-    settingsMap->insert(CONFIG_SQL_PORT, QString().number(DEFAULT_SQL_PORT) );
-    settingsMap->insert(CONFIG_SQL_DBTYPE, "QMYSQL" );
-    settingsMap->insert(CONFIG_SQL_DBNAME, "");
-    settingsMap->insert(CONFIG_SQL_DBUSER, "");
-    settingsMap->insert(CONFIG_SQL_DBPASS, "");
-    settingsMap->insert(CONFIG_TCP_AUTOSTART, QString().number(0) );
-    settingsMap->insert(CONFIG_TCP_PORT, QString().number(DEFAULT_TCP_PORT));
-    settingsMap->insert(CONFIG_TCP_MAXCONNECTIONS, QString().number(DEFAULT_TCP_MAXCONNECTIONS) );
-    settingsMap->insert(CONFIG_TCP_DUPLICATECONNECTIONS, QString().number(0) );
-    settingsMap->insert(CONFIG_VERBOSITY, QString().number(VERBOSE_PRIORITY::PRIORITY_LOW) );
+    settingsMap = new QMap<QString, ConfigValue>();
+    settingsMap->insert(CONFIG_SQL_AUTOSTART, ConfigValue(0, true) );
+    settingsMap->insert(CONFIG_SQL_HOSTNAME, ConfigValue("localhost", MAX_HOSTNAME_LENGTH) );
+    settingsMap->insert(CONFIG_SQL_PORT, ConfigValue(DEFAULT_SQL_PORT, UINT16_MAX) );
+    settingsMap->insert(CONFIG_SQL_DBTYPE, ConfigValue("QMYSQL", 24) ); //QT does not ship with any database drivers with a longer name length than 24. (Actually much less)
+    settingsMap->insert(CONFIG_SQL_DBNAME, ConfigValue("", MAX_SQL_DBNAME) );
+    settingsMap->insert(CONFIG_SQL_DBUSER, ConfigValue("", MAX_SQL_USERNAME) );
+    settingsMap->insert(CONFIG_SQL_DBPASS, ConfigValue("", MAX_SQL_PASSWORD) );
+    settingsMap->insert(CONFIG_TCP_AUTOSTART, ConfigValue(0, true) );
+    settingsMap->insert(CONFIG_TCP_PORT, ConfigValue(DEFAULT_TCP_PORT, UINT16_MAX) );
+    settingsMap->insert(CONFIG_TCP_MAXCONNECTIONS, ConfigValue(DEFAULT_TCP_MAXCONNECTIONS, MAX_TCP_CONNECTIONS) );
+    settingsMap->insert(CONFIG_TCP_DUPLICATECONNECTIONS, ConfigValue(0, true) );
+    settingsMap->insert(CONFIG_VERBOSITY, ConfigValue(VERBOSE_PRIORITY::PRIORITY_LOW, VERBOSE_PRIORITY::PRIORITY_LOW ) );
     //
 
 
@@ -72,10 +72,23 @@ bool BackendServer::LoadConfigFromFile(const QString &filename )
             cfgLine[0].remove(CHAR_WHITESPACE); //remove whitespaces first, just in case
             if ( settingsMap->contains(cfgLine[0]) ) //make sure the key already exists in the map.
             {
-                if ( settingsMap->value( cfgLine[0]) == cfgLine[1] )
+                ConfigValue *config = &settingsMap->operator [](cfgLine[0]);
+                if ( !config ) //just in case
+                    continue;
+
+                if ( config->getString() == cfgLine[1] )
                     continue; //move to the next line, we're not changing this setting.
 
-                 settingsMap->operator [](cfgLine[0]) = cfgLine[1]; //modify the value of this key
+                if( config->setValue(cfgLine[1]) != CONFIG_SETVALUE::SUCCESS)
+                {
+                    if ( config->getConfigType() == CONFIGURATION_TYPE::TYPE_STRING )
+                        printToConsole("The number of characters for " + cfgLine[0] + " must be between: " + QString().number(config->getMinValue())
+                           + "~" + QString().number(config->getMaxValue()), VERBOSE_PRIORITY::PRIORITY_HIGH);
+                    else
+                        printToConsole("The value for " + cfgLine[0] + " must be between: " + QString().number(config->getMinValue())
+                           + "~" + QString().number(config->getMaxValue()), VERBOSE_PRIORITY::PRIORITY_HIGH);
+
+                }
             }
             else
                 printToConsole(QString("Unknown setting: ") + cfgLine[0], VERBOSE_PRIORITY::PRIORITY_MEDIUM );
@@ -97,8 +110,8 @@ bool BackendServer::saveConfigFile(const QString &filename )
         return false;
     }
 
-    QMapIterator <QString, QString> i(*settingsMap);
-    QVector<QMapIterator<QString, QString> *> parsedIterators; //pointers to the iterators that have been parsed and replaced in existing text
+    QMapIterator <QString, ConfigValue> i(*settingsMap);
+    QVector<QMapIterator<QString, ConfigValue> *> parsedIterators; //pointers to the iterators that have been parsed and replaced in existing text
     QString inputBuffer = configFile.readAll(), //read all chars into an input buffer for parsing.
             outputBuffer; //buffer to store the final output for writing.
 
@@ -123,12 +136,12 @@ bool BackendServer::saveConfigFile(const QString &filename )
             if ( lineKeyValue[0] == i.key() )//the config key in the line read from the buffer line matches the key from the iterated setting
             {
                 parsedIterators.push_back( &i ); //make sure we don't do anything with this iterator later, since it exists already
-                if ( lineKeyValue[1] == i.value() ) //same value already exists in the file for this key, just move on.
+                if ( i.value() == lineKeyValue[1] ) //same value already exists in the file for this key, just move on.
                 {
                     outputBuffer.append(inputLines[x] + CHAR_NL); //nothing changed, just append the entire existing line.
                     break;
                 }
-                lineKeyValue[1] = i.value(); //set the new value
+                lineKeyValue[1] = i.value().getString(); //set the new value
                 outputBuffer.append(lineKeyValue[0] + CHAR_CONFIG_SPLIT + lineKeyValue[1] + CHAR_NL);
                 break; //we've done what we needed to do. end this loop
             }
@@ -141,7 +154,7 @@ bool BackendServer::saveConfigFile(const QString &filename )
     {
         i.next(); //advance
         if ( !parsedIterators.contains( &i ) ) //write values that haven't been overwritten or previously read (non existant?)
-            outputBuffer.append( i.key() + CHAR_CONFIG_SPLIT + i.value() + CHAR_NL );
+            outputBuffer.append( i.key() + CHAR_CONFIG_SPLIT + i.value().getString() + CHAR_NL );
     }
 
     //At the end of itall, we write the entire output buffer to our file.
@@ -153,9 +166,9 @@ bool BackendServer::saveConfigFile(const QString &filename )
     return true;
 }
 
-void BackendServer::printToConsole( const QString &msg, uint verbose )
+void BackendServer::printToConsole( const QString &msg, VERBOSE_PRIORITY verbose )
 {
-    if ( settingsMap->value(CONFIG_VERBOSITY).toUInt() < verbose )// setting is less then passed in value? HIGHER INPUT VALUE = LOWER PRIORITY MESSAGE
+    if ( settingsMap->value(CONFIG_VERBOSITY).toInt() < verbose )// setting is less then passed in value? HIGHER INPUT VALUE = LOWER PRIORITY MESSAGE
         return; //just end here
     //Any other stuff here. if needed?
     emit printMessage( msg ); //send the message off
@@ -226,11 +239,13 @@ void BackendServer::parseConsoleMessage(const QString &msg)
         {
             printToConsole("Usage: <config> <value>");
             printToConsole("Available configuration settings and current settings: <setting>=<value>");
-            QMapIterator <QString, QString> i(*settingsMap); //needed to cleanly go through the entire settings map
+            QMapIterator <QString, ConfigValue> i(*settingsMap); //needed to cleanly go through the entire settings map
             while ( i.hasNext() )
             {
                 i.next(); //advance the iterator each pass
-                printToConsole( i.key() + CHAR_CONFIG_SPLIT + i.value(), VERBOSE_PRIORITY::PRIORITY_HIGH );
+                printToConsole( i.key() + CHAR_CONFIG_SPLIT + i.value().getString() + "    " + QString().number(i.value().getMinValue())
+                                + "~" + QString().number( i.value().getMaxValue() )
+                                + (i.value().getConfigType() == CONFIGURATION_TYPE::TYPE_STRING ? " characters" : ""), VERBOSE_PRIORITY::PRIORITY_HIGH );
             }
         }
         else
@@ -259,8 +274,8 @@ void BackendServer::handleBeginServers(const QStringList &args)
 
             if ( !port ) //no port number assigned, use default from config
             {
-                if ( !beginTCPServer( settingsMap->value(CONFIG_TCP_PORT).toUInt() ) )
-                    printToConsole( QString("Failed to open TCP server on port: ") + settingsMap->value(CONFIG_TCP_PORT) );
+                if ( !beginTCPServer( settingsMap->value(CONFIG_TCP_PORT).toInt() ) )
+                    printToConsole( QString("Failed to open TCP server on port: ") + settingsMap->value(CONFIG_TCP_PORT).getString() );
             }
             else
             {
@@ -278,8 +293,8 @@ void BackendServer::handleBeginServers(const QStringList &args)
                 port = args[x+1].toUInt();
             if ( !port )
             {
-                if ( !beginSQLConnection( settingsMap->value(CONFIG_SQL_PORT).toUInt() ))
-                    printToConsole( QString("Failed to open SQL connection on port: ") + settingsMap->value(CONFIG_SQL_PORT) );
+                if ( !beginSQLConnection( settingsMap->value(CONFIG_SQL_PORT).toInt() ))
+                    printToConsole( QString("Failed to open SQL connection on port: ") + settingsMap->value(CONFIG_SQL_PORT).getString() );
             }
             else
             {
@@ -331,13 +346,31 @@ void BackendServer::handleSetConfig(const QStringList &args)
                 printToConsole("Missing value for config: " + args[x] );
                 break; //end here
             }
+            ConfigValue *config = &settingsMap->operator [](args[x]);
+            if ( !config )
+                continue;
 
-            if ( settingsMap->value(args[x]) == args[x+1] )
+            if ( config->getString() == args[x+1] )
                 printToConsole("Value for " + args[x] + " unchanged.");
             else
             {
-                printToConsole("Setting value of " + args[x] + " to: " + args[x+1] );
-                settingsMap->operator [](args[x]) = args[x+1];
+                switch( config->setValue(args[x+1]) )
+                {
+                    case CONFIG_SETVALUE::SUCCESS:
+                        printToConsole("Setting value of " + args[x] + " to: " + args[x+1], VERBOSE_PRIORITY::PRIORITY_MEDIUM );
+                        break;
+
+                    default:
+                        {
+                            if ( config->getConfigType() == CONFIGURATION_TYPE::TYPE_STRING )
+                                printToConsole("The number of characters for " + args[x] + " must be between: " + QString().number(config->getMinValue())
+                                   + "~" + QString().number(config->getMaxValue()), VERBOSE_PRIORITY::PRIORITY_HIGH);
+                            else
+                                printToConsole("The value for " + args[x] + " must be between: " + QString().number(config->getMinValue())
+                                   + "~" + QString().number(config->getMaxValue()), VERBOSE_PRIORITY::PRIORITY_HIGH);
+                        }
+                        break;
+                }
             }
             x++; //advance past the value.
         }
@@ -362,8 +395,7 @@ void BackendServer::onClientConnected()
     connect( connection, SIGNAL(forwardString(const QString &)), this, SLOT(onClientCommunication(const QString &))); //for handling incoming data
 
     QString clientAddress = connection->getAddress();
-
-    if ( !settingsMap->value(CONFIG_TCP_DUPLICATECONNECTIONS).toUInt() ) //are we allowing duplicate client connections to the TCP server?
+    if ( !settingsMap->value(CONFIG_TCP_DUPLICATECONNECTIONS).toInt() ) //are we allowing duplicate client connections to the TCP server?
     {
         for ( int x = 0; x < p_Sockets.size(); x++ )
         {

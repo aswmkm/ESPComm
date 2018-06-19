@@ -21,7 +21,8 @@ SOURCES += main.cpp \
     server.cpp \
     socket.cpp \
     tcp.cpp \
-    sql.cpp
+    sql.cpp \
+    config.cpp
 
 HEADERS += \
     terminal_interface.h \
